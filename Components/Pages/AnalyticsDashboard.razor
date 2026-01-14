@@ -1,0 +1,670 @@
+﻿@page "/analytics"
+@inject JournalService JournalService
+@inject IJSRuntime JSRuntime
+
+<h3>Journal Analytics Dashboard</h3>
+
+@if (isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading analytics...</span>
+        </div>
+        <p class="mt-2">Crunching the numbers...</p>
+    </div>
+}
+else
+{
+    <!-- QUICK STATS ROW -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h5 class="card-title">Total Entries</h5>
+                    <h2 class="card-text">@totalEntries</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title">Current Streak</h5>
+                    <h2 class="card-text">@currentStreak days</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h5 class="card-title">Longest Streak</h5>
+                    <h2 class="card-text">@longestStreak days</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title">Missed Days</h5>
+                    <h2 class="card-text">@missedDays</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHARTS ROW -->
+    <div class="row mb-4">
+        <!-- MOOD CATEGORY DISTRIBUTION CHART -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Mood Category Distribution</h5>
+                    <small class="text-muted">Based on Secondary Moods</small>
+                </div>
+                <div class="card-body">
+                    <div id="chartContainer" style="height: 300px; position: relative;">
+                        <!-- Chart will appear here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAG CLOUD -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Most Used Tags</h5>
+                </div>
+                <div class="card-body">
+                    <div class="tag-cloud">
+                        @foreach (var tag in topTags.Take(15))
+                        {
+                            <span class="tag" style="font-size: @(12 + tag.Count * 2)px">
+                                @tag.Name
+                                <small class="text-muted">(@tag.Count)</small>
+                            </span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DETAILED STATS ROW -->
+    <div class="row">
+        <!-- MOOD STATISTICS -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Mood Statistics</h5>
+                    <small class="text-muted">Individual Moods</small>
+                </div>
+                <div class="card-body">
+                    @if (moodStatistics.Any())
+                    {
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Mood</th>
+                                    <th>Count</th>
+                                    <th>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var mood in moodStatistics)
+                                {
+                                    <tr>
+                                        <td>
+                                            <span style="display: inline-block; width: 10px; height: 10px; background: @GetMoodColor(mood.Mood); margin-right: 8px; border-radius: 2px;"></span>
+                                            @mood.Mood
+                                        </td>
+                                        <td>@mood.Count</td>
+                                        <td>@mood.Percentage.ToString("0.0")%</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+
+                        @if (mostFrequentMood != null)
+                        {
+                            <div class="alert alert-info mt-2">
+                                <strong>Most Frequent Mood:</strong> @mostFrequentMood.Mood
+                                (@mostFrequentMood.Count times)
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted text-center">No mood data</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- WORD COUNT TRENDS -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Writing Trends</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h6>Average Words per Entry</h6>
+                        <h3>@averageWordsPerEntry.ToString("0")</h3>
+                    </div>
+                    <div class="mb-3">
+                        <h6>Longest Entry</h6>
+                        <p class="mb-1">@(longestEntry?.Title ?? "N/A")</p>
+                        <small class="text-muted">@(longestEntryWords?.ToString() ?? "0") words</small>
+                    </div>
+                    <div>
+                        <h6>Most Productive Month</h6>
+                        <p class="mb-1">@mostProductiveMonth</p>
+                        <small class="text-muted">@entriesThisMonth entries this month</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ACTIVITY CALENDAR -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Recent Activity</h5>
+                </div>
+                <div class="card-body">
+                    <div class="activity-calendar">
+                        @for (int i = 29; i >= 0; i--)
+                        {
+                            var date = DateTime.Today.AddDays(-i);
+                            var hasEntry = entryDates.Contains(date.Date);
+                            var isToday = date.Date == DateTime.Today.Date;
+
+                            <div class="activity-day @(isToday ? "today" : "") @(hasEntry ? "has-entry" : "")"
+                                 title="@date.ToString("MMM d, yyyy") - @(hasEntry ? "Has entry" : "No entry")">
+                                @if (hasEntry)
+                                {
+                                    <div class="entry-dot"></div>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="mt-2 text-center">
+                        <small class="text-muted">Last 30 days</small>
+                        <div class="d-flex justify-content-center mt-1">
+                            <div class="d-flex align-items-center me-3">
+                                <div class="entry-dot me-1"></div>
+                                <small>Has entry</small>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <div class="entry-dot empty me-1"></div>
+                                <small>No entry</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DATE RANGE FILTER -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Date Range Filter</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label class="form-label">From Date</label>
+                            <input type="date" class="form-control"
+                                   @bind="filterStartDate"
+                                   @bind:format="yyyy-MM-dd" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">To Date</label>
+                            <input type="date" class="form-control"
+                                   @bind="filterEndDate"
+                                   @bind:format="yyyy-MM-dd" />
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button class="btn btn-primary w-100" @onclick="LoadAnalytics">
+                                Update Analytics
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .tag-cloud {
+        text-align: center;
+        line-height: 2.5;
+    }
+
+    .tag {
+        display: inline-block;
+        margin: 5px;
+        padding: 3px 8px;
+        background-color: #e9ecef;
+        border-radius: 15px;
+        transition: all 0.3s;
+    }
+
+        .tag:hover {
+            background-color: #007bff;
+            color: white;
+            transform: scale(1.05);
+        }
+
+    .activity-calendar {
+        display: grid;
+        grid-template-columns: repeat(10, 1fr);
+        gap: 4px;
+    }
+
+    .activity-day {
+        width: 20px;
+        height: 20px;
+        border-radius: 3px;
+        background-color: #e9ecef;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+        .activity-day.has-entry {
+            background-color: #28a745;
+        }
+
+        .activity-day.today {
+            border: 2px solid #007bff;
+        }
+
+    .entry-dot {
+        width: 8px;
+        height: 8px;
+        background-color: white;
+        border-radius: 50%;
+    }
+
+        .entry-dot.empty {
+            background-color: #e9ecef;
+            border: 1px solid #dee2e6;
+        }
+
+    .card {
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+        .card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transition: box-shadow 0.3s;
+        }
+</style>
+
+@code {
+    // Analytics data
+    private bool isLoading = true;
+    private List<JournalEntry> entries = new();
+    private HashSet<DateTime> entryDates = new();
+
+    // Streak tracking
+    private int currentStreak = 0;
+    private int longestStreak = 0;
+    private int missedDays = 0;
+
+    // Quick stats
+    private int totalEntries = 0;
+    private int entriesThisMonth = 0;
+    private double averageWordsPerEntry = 0;
+    private int? longestEntryWords = null;
+    private JournalEntry? longestEntry = null;
+    private string mostProductiveMonth = "";
+
+    // Mood statistics
+    private List<MoodStat> moodStatistics = new();
+    private MoodStat? mostFrequentMood = null;
+
+    // Mood category statistics (for chart - from SecondaryMoods)
+    private List<MoodCategoryStat> moodCategoryStats = new();
+
+    // Tag statistics
+    private List<TagStat> topTags = new();
+
+    // Date filtering
+    private DateTime filterStartDate = DateTime.Today.AddMonths(-3);
+    private DateTime filterEndDate = DateTime.Today;
+
+    // Models for statistics
+    private class MoodStat
+    {
+        public string Mood { get; set; } = "";
+        public int Count { get; set; }
+        public double Percentage { get; set; }
+    }
+
+    private class MoodCategoryStat
+    {
+        public string Category { get; set; } = "";
+        public int Count { get; set; }
+        public double Percentage { get; set; }
+        public string Color { get; set; } = "";
+    }
+
+    private class TagStat
+    {
+        public string Name { get; set; } = "";
+        public int Count { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAnalytics();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Task.Delay(300);
+            await CreateChart();
+        }
+    }
+
+    private async Task LoadAnalytics()
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Load all entries within date range
+            var allEntries = await JournalService.GetAllEntriesWithDetailsAsync();
+            entries = allEntries
+                .Where(e => e.EntryDate.Date >= filterStartDate.Date && e.EntryDate.Date <= filterEndDate.Date)
+                .ToList();
+
+            // Calculate all analytics
+            CalculateWritingStatistics();
+            CalculateStreaks();
+            CalculateMoodStatistics();
+            CalculateMoodCategoryStats();
+            CalculateTagStatistics();
+            CalculateQuickStats();
+        }
+        catch (Exception ex)
+        {
+            // Silent error
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CalculateStreaks()
+    {
+        entryDates = entries
+            .Select(e => e.EntryDate.Date)
+            .ToHashSet();
+
+        var today = DateTime.Today.Date;
+        var currentDate = today;
+        currentStreak = 0;
+        longestStreak = 0;
+        missedDays = 0;
+
+        // Calculate current streak
+        while (entryDates.Contains(currentDate))
+        {
+            currentStreak++;
+            currentDate = currentDate.AddDays(-1);
+        }
+
+        // Calculate longest streak and missed days
+        if (entryDates.Any())
+        {
+            var sortedDates = entryDates.OrderBy(d => d).ToList();
+            var startDate = sortedDates.First();
+            var endDate = sortedDates.Last();
+            var totalDays = (endDate - startDate).Days + 1;
+
+            var tempStreak = 0;
+            var maxStreak = 0;
+            var current = startDate;
+
+            for (int i = 0; i < totalDays; i++)
+            {
+                if (entryDates.Contains(current))
+                {
+                    tempStreak++;
+                    maxStreak = Math.Max(maxStreak, tempStreak);
+                }
+                else
+                {
+                    tempStreak = 0;
+                    missedDays++;
+                }
+                current = current.AddDays(1);
+            }
+
+            longestStreak = maxStreak;
+        }
+    }
+
+    private void CalculateMoodStatistics()
+    {
+        // Filter out empty moods
+        var entriesWithMood = entries.Where(e => !string.IsNullOrWhiteSpace(e.PrimaryMood)).ToList();
+
+        if (entriesWithMood.Count == 0)
+        {
+            moodStatistics = new List<MoodStat>();
+            mostFrequentMood = null;
+            return;
+        }
+
+        var moodGroups = entriesWithMood
+            .GroupBy(e => e.PrimaryMood.Trim())
+            .Select(g => new MoodStat
+            {
+                Mood = g.Key,
+                Count = g.Count(),
+                Percentage = totalEntries > 0 ? Math.Round((g.Count() * 100.0) / totalEntries, 1) : 0
+            })
+            .OrderByDescending(m => m.Count)
+            .ToList();
+
+        moodStatistics = moodGroups;
+        mostFrequentMood = moodGroups.FirstOrDefault();
+    }
+
+    private void CalculateMoodCategoryStats()
+    {
+        int positiveCount = 0;
+        int neutralCount = 0;
+        int negativeCount = 0;
+
+        // Count all SecondaryMood categories
+        foreach (var entry in entries)
+        {
+            foreach (var secondaryMood in entry.SecondaryMoods)
+            {
+                var category = secondaryMood.Category?.Trim() ?? "";
+
+                if (string.Equals(category, "Positive", StringComparison.OrdinalIgnoreCase))
+                {
+                    positiveCount++;
+                }
+                else if (string.Equals(category, "Neutral", StringComparison.OrdinalIgnoreCase))
+                {
+                    neutralCount++;
+                }
+                else if (string.Equals(category, "Negative", StringComparison.OrdinalIgnoreCase))
+                {
+                    negativeCount++;
+                }
+            }
+        }
+
+        var total = positiveCount + neutralCount + negativeCount;
+
+        moodCategoryStats = new List<MoodCategoryStat>
+        {
+            new MoodCategoryStat
+            {
+                Category = "Positive",
+                Count = positiveCount,
+                Percentage = total > 0 ? Math.Round((positiveCount * 100.0) / total, 1) : 0,
+                Color = "#28a745"
+            },
+            new MoodCategoryStat
+            {
+                Category = "Neutral",
+                Count = neutralCount,
+                Percentage = total > 0 ? Math.Round((neutralCount * 100.0) / total, 1) : 0,
+                Color = "#6c757d"
+            },
+            new MoodCategoryStat
+            {
+                Category = "Negative",
+                Count = negativeCount,
+                Percentage = total > 0 ? Math.Round((negativeCount * 100.0) / total, 1) : 0,
+                Color = "#dc3545"
+            }
+        }.Where(c => c.Count > 0).ToList();
+    }
+
+    private void CalculateTagStatistics()
+    {
+        var tagCounts = new Dictionary<string, int>();
+
+        foreach (var entry in entries)
+        {
+            foreach (var tag in entry.Tags)
+            {
+                if (!string.IsNullOrWhiteSpace(tag.TagName))
+                {
+                    var tagName = tag.TagName.Trim();
+                    if (tagCounts.ContainsKey(tagName))
+                    {
+                        tagCounts[tagName]++;
+                    }
+                    else
+                    {
+                        tagCounts[tagName] = 1;
+                    }
+                }
+            }
+        }
+
+        topTags = tagCounts
+            .Select(kv => new TagStat { Name = kv.Key, Count = kv.Value })
+            .OrderByDescending(t => t.Count)
+            .ToList();
+    }
+
+    private void CalculateWritingStatistics()
+    {
+        totalEntries = entries.Count;
+
+        if (entries.Any())
+        {
+            // Calculate word counts
+            var wordCounts = entries.Select(e =>
+            {
+                if (string.IsNullOrEmpty(e.Content))
+                    return 0;
+
+                var cleanContent = System.Text.RegularExpressions.Regex.Replace(e.Content, "<.*?>", string.Empty);
+                return cleanContent.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries).Length;
+            }).ToList();
+
+            averageWordsPerEntry = wordCounts.Any() ? wordCounts.Average() : 0;
+            longestEntryWords = wordCounts.Any() ? wordCounts.Max() : 0;
+
+            if (longestEntryWords > 0 && entries.Count > 0)
+            {
+                var longestIndex = wordCounts.IndexOf(longestEntryWords.Value);
+                longestEntry = entries[longestIndex];
+            }
+
+            // Find most productive month
+            var monthGroups = entries
+                .GroupBy(e => new { e.EntryDate.Year, e.EntryDate.Month })
+                .Select(g => new
+                {
+                    Month = new DateTime(g.Key.Year, g.Key.Month, 1).ToString("MMMM yyyy"),
+                    Count = g.Count()
+                })
+                .OrderByDescending(g => g.Count)
+                .FirstOrDefault();
+
+            mostProductiveMonth = monthGroups?.Month ?? "N/A";
+        }
+        else
+        {
+            averageWordsPerEntry = 0;
+            longestEntryWords = null;
+            longestEntry = null;
+            mostProductiveMonth = "N/A";
+        }
+    }
+
+    private void CalculateQuickStats()
+    {
+        var today = DateTime.Today;
+        var firstDayOfMonth = new DateTime(today.Year, today.Month, 1);
+        var lastDayOfMonth = firstDayOfMonth.AddMonths(1).AddDays(-1);
+
+        entriesThisMonth = entries
+            .Count(e => e.EntryDate.Date >= firstDayOfMonth && e.EntryDate.Date <= lastDayOfMonth);
+    }
+
+    private async Task CreateChart()
+    {
+        if (moodCategoryStats.Count == 0)
+        {
+            return;
+        }
+
+        await Task.Delay(200);
+
+        try
+        {
+            var labels = moodCategoryStats.Select(m => m.Category).ToArray();
+            var data = moodCategoryStats.Select(m => m.Count).ToArray();
+            var colors = moodCategoryStats.Select(m => m.Color).ToArray();
+
+            await JSRuntime.InvokeVoidAsync("createSimpleChart",
+                "chartContainer",
+                labels,
+                data,
+                colors);
+        }
+        catch
+        {
+            // Silent error
+        }
+    }
+
+    private string GetMoodColor(string mood)
+    {
+        return mood.ToLower() switch
+        {
+            "happy" => "#28a745",
+            "sad" => "#6f42c1",
+            "angry" => "#dc3545",
+            "relaxed" => "#17a2b8",
+            "anxious" => "#fd7e14",
+            _ => "#6c757d"
+        };
+    }
+}

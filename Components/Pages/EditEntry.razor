@@ -169,6 +169,18 @@ else
             selectedSecondaryMoods.Remove(mood);
     }
 
+    //category retrive 
+    private string GetCategoryForMood(string moodName)
+    {
+        if (secondaryMoodCategories["Positive"].Contains(moodName))
+            return "Positive";
+        else if (secondaryMoodCategories["Neutral"].Contains(moodName))
+            return "Neutral";
+        else if (secondaryMoodCategories["Negative"].Contains(moodName))
+            return "Negative";
+        return "Unknown";
+    }
+
     private bool IsSecondaryDisabled(string mood) =>
         selectedSecondaryMoods.Count >= 2 &&
         !selectedSecondaryMoods.Contains(mood);
@@ -207,7 +219,7 @@ else
         entry.Content = cleaned;
 
         var tags = selectedTags.Select(t => new Tag { TagName = t }).ToList();
-        var moods = selectedSecondaryMoods.Select(m => new SecondaryMood { MoodName = m }).ToList();
+        var moods = selectedSecondaryMoods.Select(m => new SecondaryMood { MoodName = m, Category = GetCategoryForMood(m) }).ToList();
 
         if (await JournalService.UpdateEntryAsync(entry, tags, moods))
             Navigation.NavigateTo("/dashboard");

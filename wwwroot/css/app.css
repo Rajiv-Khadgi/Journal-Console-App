@@ -214,3 +214,84 @@ h1:focus {
 .date-range-inputs .form-control {
     font-size: 0.9rem;
 }
+
+
+
+/*analytics page*/
+/* Analytics Dashboard Styles */
+.analytics-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    border-radius: 10px;
+}
+
+    .analytics-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+    }
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.tag-cloud-container {
+    min-height: 200px;
+}
+
+.activity-calendar {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 5px;
+    margin: 10px 0;
+}
+
+.activity-day {
+    aspect-ratio: 1;
+    border-radius: 3px;
+    background-color: #e9ecef;
+    position: relative;
+    cursor: help;
+}
+
+    .activity-day.has-entry {
+        background-color: #28a745;
+    }
+
+    .activity-day.today {
+        border: 2px solid #007bff;
+    }
+
+.chart-container {
+    position: relative;
+    height: 300px;
+}
+
+/* Color coding for moods */
+.mood-happy {
+    color: #28a745;
+}
+
+.mood-sad {
+    color: #6f42c1;
+}
+
+.mood-angry {
+    color: #dc3545;
+}
+
+.mood-relaxed {
+    color: #17a2b8;
+}
+
+.mood-anxious {
+    color: #fd7e14;
+}
