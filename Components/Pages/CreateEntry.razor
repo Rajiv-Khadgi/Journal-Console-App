@@ -1,0 +1,218 @@
+﻿@page "/create"
+
+@inject JournalService JournalService
+@inject DailyLimitService LimitService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<h3>Create Journal Entry</h3>
+
+@if (!canCreate)
+{
+    <p class="text-danger">You have already created a journal today.</p>
+}
+else
+{
+    <EditForm Model="entry" OnSubmit="CreateEntryAsync">
+
+        <!-- TITLE -->
+        <div class="mb-3">
+            <label class="form-label">Title *</label>
+            <input class="form-control" @bind="entry.Title" />
+            @if (titleError)
+            {
+                <small class="text-danger">Title is required.</small>
+            }
+        </div>
+
+        <!-- CONTENT -->
+        <div class="mb-3">
+            <label class="form-label">Content *</label>
+            <div id="editor" class="border p-2"></div>
+            @if (contentError)
+            {
+                <small class="text-danger">Content cannot be empty.</small>
+            }
+        </div>
+
+        <!-- PRIMARY MOOD -->
+        <div class="mb-3">
+            <label class="form-label">Primary Mood *</label>
+            <select class="form-select" @bind="entry.PrimaryMood">
+                <option value="">-- Select --</option>
+                @foreach (var mood in primaryMoods)
+                {
+                    <option value="@mood">@mood</option>
+                }
+            </select>
+            @if (primaryMoodError)
+            {
+                <small class="text-danger">Primary mood is required.</small>
+            }
+        </div>
+
+        <!-- SECONDARY MOODS -->
+        <div class="mb-3">
+            <label>Secondary Moods (max 2, at least 1 required)</label>
+
+            @foreach (var group in secondaryMoodCategories)
+            {
+                <br/>
+                <strong>@group.Key</strong>
+                @foreach (var mood in group.Value)
+                {
+                    <div>
+                        <input type="checkbox"
+                               disabled="@IsSecondaryDisabled(mood)"
+                               checked="@selectedSecondaryMoods.Contains(mood)"
+                               @onchange="e => OnSecondaryMoodChanged(e, mood)" />
+                        @mood
+                    </div>
+                }
+            }
+
+            @if (secondaryMoodError)
+            {
+                <small class="text-danger">Select at least one secondary mood.</small>
+            }
+        </div>
+
+        <!-- TAGS -->
+        <div class="mb-3">
+            <label>Tags (optional)</label>
+
+            @foreach (var tag in predefinedTags)
+            {
+                <label class="me-2">
+                    <input type="checkbox"
+                           checked="@selectedTags.Contains(tag)"
+                           @onchange="e => OnTagChanged(e, tag)" />
+                    @tag
+                </label>
+            }
+
+            <div class="input-group mt-2">
+                <input class="form-control" placeholder="Custom tag"
+                       @bind="customTagInput" />
+                <button type="button" class="btn btn-outline-secondary"
+                        @onclick="AddCustomTag">
+                    Add
+                </button>
+            </div>
+
+            @foreach (var tag in selectedTags)
+            {
+                <span class="badge bg-secondary me-1">@tag</span>
+            }
+        </div>
+
+        <button class="btn btn-primary">Save Entry</button>
+    </EditForm>
+}
+
+@code {
+
+    private JournalEntry entry = new() { EntryDate = DateTime.Today };
+    private bool canCreate = true;
+    private bool titleError;
+    private bool contentError;
+    private bool primaryMoodError;
+    private bool secondaryMoodError;
+
+    private readonly List<string> primaryMoods =
+        new() { "Happy", "Sad", "Angry", "Relaxed", "Anxious" };
+
+    private readonly Dictionary<string, List<string>> secondaryMoodCategories =
+        new()
+        {
+            { "Positive", new() { "Excited", "Grateful", "Confident" } },
+            { "Neutral", new() { "Calm", "Thoughtful" } },
+            { "Negative", new() { "Lonely", "Stressed" } }
+        };
+
+    private List<string> selectedSecondaryMoods = new();
+
+    private readonly List<string> predefinedTags =
+        new() { "Work", "Health", "Study", "Travel" };
+
+    private List<string> selectedTags = new();
+    private string customTagInput = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            canCreate = await LimitService.CanCreateAsync();
+            try { await JSRuntime.InvokeVoidAsync("initQuill"); }
+            catch { }
+        }
+    }
+
+    private void OnSecondaryMoodChanged(ChangeEventArgs e, string mood)
+    {
+        bool isChecked = e.Value is bool b && b;
+
+        if (isChecked && selectedSecondaryMoods.Count < 2)
+            selectedSecondaryMoods.Add(mood);
+        else if (!isChecked)
+            selectedSecondaryMoods.Remove(mood);
+    }
+
+    private bool IsSecondaryDisabled(string mood) =>
+        selectedSecondaryMoods.Count >= 2 &&
+        !selectedSecondaryMoods.Contains(mood);
+
+    private void OnTagChanged(ChangeEventArgs e, string tag)
+    {
+        bool isChecked = e.Value is bool b && b;
+
+        if (isChecked && !selectedTags.Contains(tag))
+            selectedTags.Add(tag);
+        else if (!isChecked)
+            selectedTags.Remove(tag);
+    }
+
+    private void AddCustomTag()
+    {
+        var tag = customTagInput?.Trim();
+        if (!string.IsNullOrWhiteSpace(tag) && !selectedTags.Contains(tag))
+            selectedTags.Add(tag);
+
+        customTagInput = "";
+    }
+
+    private async Task CreateEntryAsync()
+    {
+        // Title validation
+        titleError = string.IsNullOrWhiteSpace(entry.Title);
+
+        // Content validation
+        var raw = await JSRuntime.InvokeAsync<string>("getQuillContent");
+
+        var cleaned = raw
+            .Replace("<p><br></p>", "")
+            .Replace("<p></p>", "")
+            .Replace("&nbsp;", "")
+            .Trim();
+
+        contentError = string.IsNullOrWhiteSpace(cleaned);
+
+
+        // Primary mood validation
+        primaryMoodError = string.IsNullOrWhiteSpace(entry.PrimaryMood);
+
+        // Secondary mood validation (must select at least one)
+        secondaryMoodError = selectedSecondaryMoods.Count == 0;
+
+        // Stop if any errors
+        if (titleError || contentError || primaryMoodError || secondaryMoodError) return;
+
+        entry.Content = cleaned;
+
+        var tags = selectedTags.Select(t => new Tag { TagName = t }).ToList();
+        var moods = selectedSecondaryMoods.Select(m => new SecondaryMood { MoodName = m }).ToList();
+
+        if (await JournalService.CreateEntryAsync(entry, tags, moods))
+            Navigation.NavigateTo("/dashboard");
+    }
+}

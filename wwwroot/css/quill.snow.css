@@ -1,0 +1,10 @@
+/* quill.snow.css */
+.ql-toolbar.ql-snow {
+    border: 1px solid #ccc;
+    border-bottom: none;
+}
+
+.ql-container.ql-snow {
+    border: 1px solid #ccc;
+    height: 200px;
+}
