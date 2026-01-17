@@ -61,14 +61,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Compile Remove="Components\Pages\EditEntry.razor.cs" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Content Include="Components\Pages\EditEntry.razor.cs" />
-    </ItemGroup>
-
-    <ItemGroup>
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.5" />

@@ -1,33 +1,28 @@
-﻿@page "/create"
+﻿@page "/edit/{Id:int}"
 
 @inject JournalService JournalService
 @inject DailyLimitService LimitService
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
-<h3>Create Journal Entry</h3>
+<h3>Edit Journal Entry</h3>
 
-@if (!canCreate)
+@if (entry == null)
 {
-    <div class="alert alert-warning">
-        <h5>Cannot Create Entry Today</h5>
-        <p>
-            You have already created a journal entry today.
-            Even if you deleted it, you cannot create another one today.
-        </p>
-        <div class="mt-2">
-            <a href="/dashboard" class="btn btn-secondary">Go to Dashboard</a>
-        </div>
-    </div>
+    <p>Loading entry...</p>
+}
+else if (!canEdit)
+{
+    <p class="text-danger">You have already edited a journal today.</p>
 }
 else
 {
-    <EditForm Model="entry" OnSubmit="CreateEntryAsync">
+    <EditForm Model="entry" OnSubmit="UpdateEntryAsync">
 
         <!-- TITLE -->
         <div class="mb-3">
             <label class="form-label">Title *</label>
-            <input class="form-control" @bind="entry.Title" />
+            <InputText class="form-control" @bind-Value="entry.Title" />
             @if (titleError)
             {
                 <small class="text-danger">Title is required.</small>
@@ -51,7 +46,7 @@ else
                 <option value="">-- Select --</option>
                 @foreach (var mood in primaryMoods)
                 {
-                    <option value="@mood">@mood</option>
+                    <option value="@mood" selected="@(entry.PrimaryMood == mood)">@mood</option>
                 }
             </select>
             @if (primaryMoodError)
@@ -62,7 +57,7 @@ else
 
         <!-- SECONDARY MOODS -->
         <div class="mb-3">
-            <label>Secondary Moods (max 2, at least 1 required)</label>
+            <label>Secondary Moods (max 2)</label>
 
             @foreach (var group in secondaryMoodCategories)
             {
@@ -79,16 +74,11 @@ else
                     </div>
                 }
             }
-
-            @if (secondaryMoodError)
-            {
-                <small class="text-danger">Select at least one secondary mood.</small>
-            }
         </div>
 
         <!-- TAGS -->
         <div class="mb-3">
-            <label>Tags (optional)</label>
+            <label>Tags</label>
 
             @foreach (var tag in predefinedTags)
             {
@@ -115,18 +105,19 @@ else
             }
         </div>
 
-        <button class="btn btn-primary">Save Entry</button>
+        <button class="btn btn-primary">Update Entry</button>
     </EditForm>
 }
 
 @code {
+    [Parameter] public int Id { get; set; }
 
-    private JournalEntry entry = new() { EntryDate = DateTime.Today };
-    private bool canCreate = true;
+    private JournalEntry? entry;
+    private bool canEdit = true;
+
     private bool titleError;
     private bool contentError;
     private bool primaryMoodError;
-    private bool secondaryMoodError;
 
     private readonly List<string> primaryMoods =
         new() { "Happy", "Sad", "Angry", "Relaxed", "Anxious" };
@@ -147,13 +138,24 @@ else
     private List<string> selectedTags = new();
     private string customTagInput = "";
 
+    protected override async Task OnInitializedAsync()
+    {
+        entry = await JournalService.GetEntryWithDetailsAsync(Id);
+        if (entry == null) return;
+
+        selectedSecondaryMoods = entry.SecondaryMoods.Select(m => m.MoodName).ToList();
+        selectedTags = entry.Tags.Select(t => t.TagName).ToList();
+
+        canEdit = await LimitService.CanUpdateAsync();
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender && entry != null)
         {
-            canCreate = await LimitService.CanCreateAsync();
-            try { await JSRuntime.InvokeVoidAsync("initQuill"); }
-            catch { }
+            // Simple delay and initialization
+            await Task.Delay(50);
+            await JSRuntime.InvokeVoidAsync("initQuillWithContent", entry.Content);
         }
     }
 
@@ -190,38 +192,24 @@ else
         customTagInput = "";
     }
 
-    private async Task CreateEntryAsync()
+    private async Task UpdateEntryAsync()
     {
-        // Title validation
-        titleError = string.IsNullOrWhiteSpace(entry.Title);
+        titleError = string.IsNullOrWhiteSpace(entry!.Title);
 
-        // Content validation
         var raw = await JSRuntime.InvokeAsync<string>("getQuillContent");
-
-        var cleaned = raw
-            .Replace("<p><br></p>", "")
-            .Replace("<p></p>", "")
-            .Replace("&nbsp;", "")
-            .Trim();
-
+        var cleaned = raw.Replace("<p><br></p>", "").Trim();
         contentError = string.IsNullOrWhiteSpace(cleaned);
 
-
-        // Primary mood validation
         primaryMoodError = string.IsNullOrWhiteSpace(entry.PrimaryMood);
 
-        // Secondary mood validation (must select at least one)
-        secondaryMoodError = selectedSecondaryMoods.Count == 0;
-
-        // Stop if any errors
-        if (titleError || contentError || primaryMoodError || secondaryMoodError) return;
+        if (titleError || contentError || primaryMoodError) return;
 
         entry.Content = cleaned;
 
         var tags = selectedTags.Select(t => new Tag { TagName = t }).ToList();
         var moods = selectedSecondaryMoods.Select(m => new SecondaryMood { MoodName = m }).ToList();
 
-        if (await JournalService.CreateEntryAsync(entry, tags, moods))
+        if (await JournalService.UpdateEntryAsync(entry, tags, moods))
             Navigation.NavigateTo("/dashboard");
     }
 }

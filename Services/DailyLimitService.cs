@@ -14,39 +14,57 @@ namespace JournalApps.Services
             _db = db;
         }
 
+        // CREATE: Can only create ONCE per day (even if deleted)
         public async Task<bool> CanCreateAsync()
         {
             var today = DateTime.Today;
-            var entry = await _db.Connection.Table<JournalEntry>()
-                .Where(e => e.EntryDate == today)
+            var tomorrow = today.AddDays(1);
+
+            // Check if already created ANY entry today (tracked separately)
+            var createdToday = await _db.Connection.Table<CreateHistory>()
+                .Where(c => c.CreatedAt >= today && c.CreatedAt < tomorrow)
                 .FirstOrDefaultAsync();
-            return entry == null; // Can create only if no entry exists today
+
+            return createdToday == null; // Can create if no create history today
         }
 
+        // EDIT: Can only edit ONCE per day
         public async Task<bool> CanUpdateAsync()
         {
             var today = DateTime.Today;
+            var tomorrow = today.AddDays(1);
+
             var count = await _db.Connection.Table<UpdateHistory>()
-                .Where(u => u.UpdatedAt.Date == today)
+                .Where(u => u.UpdatedAt >= today && u.UpdatedAt < tomorrow)
                 .CountAsync();
-            return count == 0; // Only one update allowed per day
+
+            return count == 0;
         }
 
+        // DELETE: Can only delete ONCE per day
         public async Task<bool> CanDeleteAsync()
         {
             var today = DateTime.Today;
+            var tomorrow = today.AddDays(1);
+
             var count = await _db.Connection.Table<DeleteHistory>()
-                .Where(d => d.DeletedAt.Date == today)
+                .Where(d => d.DeletedAt >= today && d.DeletedAt < tomorrow)
                 .CountAsync();
-            return count == 0; // Only one delete allowed per day
+
+            return count == 0;
         }
 
-        public Task MarkCreatedAsync()
+        // MARK CREATED: Called when entry is created
+        public async Task MarkCreatedAsync(int entryId)  // CHANGED: Takes entryId
         {
-            // Creation is automatically limited by the entry table itself
-            return Task.CompletedTask;
+            await _db.Connection.InsertAsync(new CreateHistory
+            {
+                EntryId = entryId,
+                CreatedAt = DateTime.Now
+            });
         }
 
+        // MARK UPDATED: Called when entry is updated
         public async Task MarkUpdatedAsync(int entryId)
         {
             await _db.Connection.InsertAsync(new UpdateHistory
@@ -56,6 +74,7 @@ namespace JournalApps.Services
             });
         }
 
+        // MARK DELETED: Called when entry is deleted
         public async Task MarkDeletedAsync(int entryId)
         {
             await _db.Connection.InsertAsync(new DeleteHistory

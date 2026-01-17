@@ -1,0 +1,201 @@
+﻿@page "/calendar"
+@inject JournalService JournalService
+
+<h3>Calendar View</h3>
+
+<div class="calendar-container">
+    <div class="calendar-header mb-3">
+        <button class="btn btn-outline-primary" @onclick="() => ChangeMonth(-1)">
+            &lt; Previous
+        </button>
+        <h4 class="d-inline mx-4">@CurrentDate.ToString("MMMM yyyy")</h4>
+        <button class="btn btn-outline-primary" @onclick="() => ChangeMonth(1)">
+            Next &gt;
+        </button>
+    </div>
+
+    <div class="calendar-grid">
+        <div class="calendar-weekdays">
+            @foreach (var day in dayNames)
+            {
+                <div class="calendar-weekday">@day</div>
+            }
+        </div>
+        
+        <div class="calendar-days">
+            @for (int i = 0; i < StartDay; i++)
+            {
+                <div class="calendar-day empty"></div>
+            }
+            
+            @for (int day = 1; day <= DaysInMonth; day++)
+            {
+                var date = new DateTime(CurrentDate.Year, CurrentDate.Month, day);
+                var hasEntry = entries.Any(e => e.EntryDate.Date == date.Date);
+                var isToday = date.Date == DateTime.Today;
+                
+                <div class="calendar-day @(isToday ? "today" : "") @(hasEntry ? "has-entry" : "")"
+                     @onclick="() => SelectDate(date)">
+                    <div class="day-number">@day</div>
+                    @if (hasEntry)
+                    {
+                        <div class="entry-indicator">📝</div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (selectedDate.HasValue)
+    {
+        <div class="selected-date-entries mt-4">
+            <h4>Entries for @selectedDate.Value.ToString("MMMM d, yyyy")</h4>
+            @if (selectedEntries.Any())
+            {
+                <div class="list-group">
+                    @foreach (var entry in selectedEntries)
+                    {
+                        <div class="list-group-item">
+                            <h5>@entry.Title</h5>
+                            <p>@GetContentPreview(entry.Content)</p>
+                            <small class="text-muted">
+                                Primary Mood: @entry.PrimaryMood
+                                @if (entry.SecondaryMoods.Any())
+                                {
+                                    <span> | Secondary: @string.Join(", ", entry.SecondaryMoods.Select(m => m.MoodName))</span>
+                                }
+                            </small>
+                            <div class="mt-2">
+                                <a href="/edit/@entry.Id" class="btn btn-sm btn-primary">Edit</a>
+                                <a href="/view/@entry.Id" class="btn btn-sm btn-secondary">View</a>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p>No entries for this date. <a href="/create">Create one?</a></p>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .calendar-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 1px;
+        background-color: #dee2e6;
+        border: 1px solid #dee2e6;
+    }
+    
+    .calendar-weekdays, .calendar-days {
+        display: contents;
+    }
+    
+    .calendar-weekday, .calendar-day {
+        background-color: white;
+        padding: 10px;
+        min-height: 80px;
+    }
+    
+    .calendar-weekday {
+        font-weight: bold;
+        text-align: center;
+        padding: 15px 10px;
+        background-color: #f8f9fa;
+    }
+    
+    .calendar-day {
+        cursor: pointer;
+        position: relative;
+    }
+    
+    .calendar-day:hover {
+        background-color: #e9ecef;
+    }
+    
+    .calendar-day.today {
+        background-color: #e7f3ff;
+        font-weight: bold;
+    }
+    
+    .calendar-day.has-entry {
+        border: 2px solid #0d6efd;
+    }
+    
+    .day-number {
+        font-size: 1.1em;
+        margin-bottom: 5px;
+    }
+    
+    .entry-indicator {
+        position: absolute;
+        bottom: 5px;
+        right: 5px;
+        font-size: 0.8em;
+    }
+    
+    .calendar-day.empty {
+        background-color: #f8f9fa;
+        cursor: default;
+    }
+</style>
+
+@code {
+    private DateTime CurrentDate = DateTime.Today;
+    private List<JournalEntry> entries = new();
+    private DateTime? selectedDate = null;
+    private List<JournalEntry> selectedEntries = new();
+    
+    private string[] dayNames = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+    
+    private int DaysInMonth => DateTime.DaysInMonth(CurrentDate.Year, CurrentDate.Month);
+    private int StartDay => (int)new DateTime(CurrentDate.Year, CurrentDate.Month, 1).DayOfWeek;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEntriesForMonth();
+    }
+    
+    private async Task LoadEntriesForMonth()
+    {
+        entries = await JournalService.GetAllEntriesWithDetailsAsync();
+    }
+    
+    private void ChangeMonth(int months)
+    {
+        CurrentDate = CurrentDate.AddMonths(months);
+        StateHasChanged();
+    }
+    
+    private async void SelectDate(DateTime date)
+    {
+        selectedDate = date;
+        selectedEntries = entries
+            .Where(e => e.EntryDate.Date == date.Date)
+            .ToList();
+        StateHasChanged();
+    }
+    
+    private string GetContentPreview(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return "No content";
+        
+        // Strip HTML tags for preview
+        var plainText = System.Text.RegularExpressions.Regex.Replace(content, "<.*?>", string.Empty);
+        
+        if (plainText.Length > 100)
+        {
+            return plainText.Substring(0, 100) + "...";
+        }
+        
+        return plainText;
+    }
+}

@@ -1,5 +1,5 @@
 ﻿
-using JournalApps.Models; // Make sure your models namespace matches
+using JournalApps.Models; 
 using SQLite;
 using System.IO;
 using System.Threading.Tasks;
@@ -9,7 +9,7 @@ namespace JournalApps.Data
 {
     public class AppDatabase
     {
-        // SQLite async connection (read-only outside)
+        
         public SQLiteAsyncConnection Connection { get; private set; }
 
         public AppDatabase()
@@ -31,6 +31,7 @@ namespace JournalApps.Data
             await Connection.CreateTableAsync<SecondaryMood>();
             await Connection.CreateTableAsync<UpdateHistory>();
             await Connection.CreateTableAsync<DeleteHistory>();
+            await Connection.CreateTableAsync<CreateHistory>();
         }
     }
 }

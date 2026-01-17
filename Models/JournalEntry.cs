@@ -14,6 +14,7 @@ namespace JournalApps.Models
 
         public string PrimaryMood { get; set; } = string.Empty;
 
+        public bool IsDeleted { get; set; } = false;
         public DateTime EntryDate { get; set; } = DateTime.Today;
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
