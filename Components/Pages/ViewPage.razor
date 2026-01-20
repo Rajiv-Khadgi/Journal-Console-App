@@ -1,4 +1,4 @@
-﻿@page "/view/{Id:int}"
+﻿@* @page "/view/{Id:int}"
 @inject JournalService JournalService
 @inject NavigationManager Navigation
 
@@ -74,4 +74,184 @@ else
     {
         Navigation.NavigateTo("/calendar");
     }
+} *@
+
+
+@page "/view/{Id:int}"
+@inject JournalService JournalService
+@inject PdfExportService PdfExportService
+@inject NavigationManager Navigation
+
+<h3>View Journal Entry</h3>
+
+@if (entry == null)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading entry...</span>
+        </div>
+        <p class="mt-2">Loading entry...</p>
+    </div>
+}
+else
+{
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-0">@entry.Title</h4>
+                    <small>
+                        <i class="oi oi-calendar"></i>
+                        @entry.EntryDate.ToString("dddd, MMMM dd, yyyy")
+                    </small>
+                </div>
+                <div>
+                    <span class="badge bg-light text-dark fs-6">@entry.PrimaryMood</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-body">
+            <!-- Content with rich text rendering -->
+            <div class="entry-content mb-4">
+                @((MarkupString)entry.Content)
+            </div>
+
+            <hr />
+
+            <!-- Secondary Moods -->
+            @if (entry.SecondaryMoods.Any())
+            {
+                <div class="mb-3">
+                    <h6>Secondary Moods:</h6>
+                    <div>
+                        @foreach (var mood in entry.SecondaryMoods)
+                        {
+                            <span class="badge bg-info me-2 mb-2">
+                                @mood.MoodName
+                                <small>(@mood.Category)</small>
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- Tags -->
+            @if (entry.Tags.Any())
+            {
+                <div class="mb-3">
+                    <h6>Tags:</h6>
+                    <div>
+                        @foreach (var tag in entry.Tags)
+                        {
+                            <span class="badge bg-secondary me-2 mb-2">@tag.TagName</span>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- Timestamps -->
+            <div class="text-muted small mt-4">
+                <div>Created: @entry.CreatedAt.ToString("MMM dd, yyyy hh:mm tt")</div>
+                <div>Last Updated: @entry.UpdatedAt.ToString("MMM dd, yyyy hh:mm tt")</div>
+            </div>
+        </div>
+
+        <div class="card-footer">
+            <button class="btn btn-primary me-2" @onclick="() => EditEntry(entry.Id)">
+                <i class="oi oi-pencil"></i> Edit
+            </button>
+            <button class="btn btn-secondary me-2" @onclick="GoBack">
+                <i class="oi oi-arrow-left"></i> Back
+            </button>
+            <button class="btn btn-outline-danger" @onclick="() => DeleteEntry(entry.Id)">
+                <i class="oi oi-trash"></i> Delete
+            </button>
+            <button class="btn btn-success me-2" @onclick="() => ExportEntry(entry.Id)">
+                <i class="oi oi-cloud-download"></i> Export
+            </button>
+        </div>
+    </div>
+}
+
+<style>
+    .entry-content {
+        font-size: 1.1rem;
+        line-height: 1.6;
+    }
+
+        .entry-content p {
+            margin-bottom: 1rem;
+        }
+
+        .entry-content h1, .entry-content h2, .entry-content h3 {
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .entry-content ul, .entry-content ol {
+            padding-left: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .entry-content blockquote {
+            border-left: 4px solid #dee2e6;
+            padding-left: 1rem;
+            margin-left: 0;
+            color: #6c757d;
+            font-style: italic;
+        }
+</style>
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private JournalEntry? entry;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadEntry();
+    }
+
+    private async Task LoadEntry()
+    {
+        entry = await JournalService.GetEntryWithDetailsAsync(Id);
+    }
+
+    private void EditEntry(int id)
+    {
+        Navigation.NavigateTo($"/edit/{id}");
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/dashboard");
+    }
+
+    private async Task DeleteEntry(int id)
+    {
+        var entryToDelete = await JournalService.GetEntryByIdAsync(id);
+        if (entryToDelete != null)
+        {
+            // Add confirmation dialog here
+            await JournalService.DeleteEntryAsync(entryToDelete);
+            Navigation.NavigateTo("/dashboard");
+        }
+    }
+
+    private async Task ExportEntry(int id)
+{
+    var entry = await JournalService.GetEntryWithDetailsAsync(id);
+    if (entry != null)
+    {
+        try
+        {
+            var filePath = await PdfExportService.ExportSingleEntryToPdf(entry);
+            // Show success message or open file
+        }
+        catch (Exception ex)
+        {
+                Console.WriteLine($"Export failed: {ex.Message}");
+        }
+    }
+}
 }

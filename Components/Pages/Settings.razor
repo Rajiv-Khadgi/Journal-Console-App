@@ -1,6 +1,222 @@
 ﻿@page "/settings"
-<h3>Settings</h3>
+@inject SecurityService SecurityService
+@inject NavigationManager Navigation
+
+<h3>Security Settings</h3>
+
+<div class="card">
+    <div class="card-header">
+        <h5>PIN Protection</h5>
+    </div>
+    <div class="card-body">
+        @if (SecurityService.IsPinSet())
+        {
+            <!-- Change PIN -->
+            <div class="mb-3">
+                <h6>Change PIN</h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <input type="password" class="form-control" 
+                               placeholder="Current PIN" maxlength="4"
+                               @bind="currentPin" />
+                    </div>
+                    <div class="col-md-4">
+                        <input type="password" class="form-control" 
+                               placeholder="New PIN" maxlength="4"
+                               @bind="newPin" />
+                    </div>
+                    <div class="col-md-4">
+                        <input type="password" class="form-control" 
+                               placeholder="Confirm New PIN" maxlength="4"
+                               @bind="confirmPin" />
+                    </div>
+                </div>
+                <button class="btn btn-primary mt-2" @onclick="ChangePin" :disabled="isProcessing">
+                    @if (isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Change PIN
+                </button>
+            </div>
+            
+            <!-- Remove PIN -->
+            <div class="mb-3">
+                <h6>Remove PIN Protection</h6>
+                <p class="text-muted">Your journal will no longer be protected with a PIN.</p>
+                <button class="btn btn-outline-danger" @onclick="RemovePin">
+                    Remove PIN
+                </button>
+            </div>
+            
+            <!-- Lock Now -->
+            <div>
+                <h6>Lock App</h6>
+                <p class="text-muted">Immediately lock the app.</p>
+                <button class="btn btn-outline-secondary" @onclick="LockNow">
+                    <i class="oi oi-lock-locked"></i> Lock Now
+                </button>
+            </div>
+        }
+        else
+        {
+            <!-- Setup PIN -->
+            <div>
+                <h6>Setup PIN Protection</h6>
+                <p class="text-muted">Protect your journal with a 4-digit PIN.</p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <input type="password" class="form-control" 
+                               placeholder="Enter 4-digit PIN" maxlength="4"
+                               @bind="newPin" />
+                    </div>
+                    <div class="col-md-6">
+                        <input type="password" class="form-control" 
+                               placeholder="Confirm PIN" maxlength="4"
+                               @bind="confirmPin" />
+                    </div>
+                </div>
+                <button class="btn btn-primary mt-2" @onclick="SetPin" :disabled="isProcessing">
+                    @if (isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Setup PIN
+                </button>
+            </div>
+        }
+        
+        <!-- Status Messages -->
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <div class="alert @(isError ? "alert-danger" : "alert-success") mt-3">
+                @message
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    input[type="password"] {
+        letter-spacing: 3px;
+        font-size: 1.2rem;
+        text-align: center;
+    }
+</style>
 
 @code {
-
+    private string currentPin = "";
+    private string newPin = "";
+    private string confirmPin = "";
+    private string message = "";
+    private bool isError = false;
+    private bool isProcessing = false;
+    
+    private async Task SetPin()
+    {
+        if (string.IsNullOrWhiteSpace(newPin) || newPin.Length != 4)
+        {
+            ShowMessage("Please enter a 4-digit PIN", true);
+            return;
+        }
+        
+        if (newPin != confirmPin)
+        {
+            ShowMessage("PINs do not match", true);
+            return;
+        }
+        
+        isProcessing = true;
+        StateHasChanged();
+        
+        var success = await SecurityService.SetPinAsync(newPin);
+        
+        if (success)
+        {
+            ShowMessage("PIN setup successfully!", false);
+            ClearFields();
+        }
+        else
+        {
+            ShowMessage("Failed to setup PIN", true);
+        }
+        
+        isProcessing = false;
+        StateHasChanged();
+    }
+    
+    private async Task ChangePin()
+    {
+        if (string.IsNullOrWhiteSpace(currentPin) || currentPin.Length != 4)
+        {
+            ShowMessage("Please enter current PIN", true);
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(newPin) || newPin.Length != 4)
+        {
+            ShowMessage("Please enter a 4-digit new PIN", true);
+            return;
+        }
+        
+        if (newPin != confirmPin)
+        {
+            ShowMessage("New PINs do not match", true);
+            return;
+        }
+        
+        isProcessing = true;
+        StateHasChanged();
+        
+        var success = await SecurityService.ChangePinAsync(currentPin, newPin);
+        
+        if (success)
+        {
+            ShowMessage("PIN changed successfully!", false);
+            ClearFields();
+        }
+        else
+        {
+            ShowMessage("Failed to change PIN. Current PIN may be incorrect.", true);
+        }
+        
+        isProcessing = false;
+        StateHasChanged();
+    }
+    
+    private void RemovePin()
+    {
+        SecurityService.RemovePin();
+        ShowMessage("PIN protection removed", false);
+    }
+    
+    private void LockNow()
+    {
+        SecurityService.Lock();
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+    
+    private void ShowMessage(string msg, bool error)
+    {
+        message = msg;
+        isError = error;
+        StateHasChanged();
+        
+        // Clear message after 3 seconds
+        Task.Delay(3000).ContinueWith(_ => 
+        {
+            InvokeAsync(() =>
+            {
+                message = "";
+                StateHasChanged();
+            });
+        });
+    }
+    
+    private void ClearFields()
+    {
+        currentPin = "";
+        newPin = "";
+        confirmPin = "";
+    }
 }

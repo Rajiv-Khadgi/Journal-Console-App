@@ -30,6 +30,9 @@ namespace JournalApps
             builder.Services.AddSingleton(database);
             builder.Services.AddSingleton<DailyLimitService>();
             builder.Services.AddSingleton<JournalService>();
+            builder.Services.AddSingleton<PdfExportService>();
+            builder.Services.AddSingleton<SecurityService>();
+
 
             return builder.Build();
         }

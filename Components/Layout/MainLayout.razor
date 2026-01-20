@@ -1,17 +1,33 @@
 ﻿@inherits LayoutComponentBase
+@inject SecurityService SecurityService
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+<SecurityWrapper>
+    <div class="page">
+        <div class="sidebar">
+            <NavMenu />
         </div>
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+        <main>
+            <div class="top-row px-4">
+                @if (!SecurityService.IsLocked && SecurityService.IsPinSet())
+                {
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="LockApp" title="Lock App">
+                        <i class="oi oi-lock-locked"></i> Lock
+                    </button>
+                }
+                <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            </div>
+
+            <article class="content px-4">
+                @Body
+            </article>
+        </main>
+    </div>
+</SecurityWrapper>
+
+@code {
+    private void LockApp()
+    {
+        SecurityService.Lock();
+    }
+}

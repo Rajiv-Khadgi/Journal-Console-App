@@ -1,5 +1,62 @@
 ﻿@page "/"
 
-<h1>Hello, world!</h1>
+<h1 class="display-4">Journal App</h1>
 
-Welcome to your new app.
+<div class="row mt-5">
+    <div class="col-md-8 offset-md-2 text-center">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title">Welcome to Your Digital Journal</h2>
+                <p class="card-text">
+                    Capture your thoughts, track your moods, and reflect on your journey.
+                    Your personal space for self-reflection and growth.
+                </p>
+
+                <div class="row mt-4">
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5>📝 Write</h5>
+                                <p>Create new journal entries with rich text formatting.</p>
+                                <a href="/create" class="btn btn-primary">New Entry</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5>📊 Analyze</h5>
+                                <p>View insights and patterns in your writing.</p>
+                                <a href="/analytics" class="btn btn-primary">View Analytics</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5>🗓️ Organize</h5>
+                                <p>Browse your entries by date and mood.</p>
+                                <a href="/calendar" class="btn btn-primary">Calendar View</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <a href="/dashboard" class="btn btn-lg btn-outline-primary me-3">View All Entries</a>
+                    <a href="/search" class="btn btn-lg btn-outline-secondary">Search Entries</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        transition: transform 0.3s;
+    }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+</style>

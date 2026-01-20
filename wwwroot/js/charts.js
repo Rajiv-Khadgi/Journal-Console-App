@@ -50,3 +50,6 @@ function createSimpleChart(containerId, labels, data, colors) {
 }
 
 window.createSimpleChart = createSimpleChart;
+
+
+
