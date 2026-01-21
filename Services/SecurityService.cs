@@ -30,6 +30,11 @@ namespace JournalApps.Services
         public SecurityService()
         {
             LoadLockState();
+           
+            if(IsPinSet())
+            {
+                Lock();
+            }
         }
 
         private void LoadLockState()
