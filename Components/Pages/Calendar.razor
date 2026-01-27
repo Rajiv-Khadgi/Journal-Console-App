@@ -1,4 +1,4 @@
-﻿@page "/calendar"
+﻿@* @page "/calendar"
 @inject JournalService JournalService
 
 <h3>Calendar View</h3>
@@ -196,6 +196,598 @@
             return plainText.Substring(0, 100) + "...";
         }
         
+        return plainText;
+    }
+} *@
+
+
+
+@page "/calendar"
+@inject JournalService JournalService
+
+<div class="calendar-page">
+    <!-- HEADER -->
+    <div class="calendar-header mb-4">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h3 class="mb-2">
+                    <i class="bi bi-calendar3 me-2"></i>Calendar View
+                </h3>
+                <p class="text-muted mb-0">Browse your journal entries by date</p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <div class="btn-group" role="group">
+                    <button class="btn btn-outline-primary" @onclick="() => ChangeMonth(-1)" title="Previous month">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <button class="btn btn-outline-primary" @onclick="GoToToday" title="Go to today">
+                        Today
+                    </button>
+                    <button class="btn btn-outline-primary" @onclick="() => ChangeMonth(1)" title="Next month">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MONTH NAVIGATION -->
+        <div class="month-navigation mt-3">
+            <h4 class="current-month text-center">
+                <span class="month-year">@CurrentDate.ToString("MMMM yyyy")</span>
+                <small class="text-muted ms-2">
+                    (@entriesThisMonth entries, @uniqueEntryDays days with entries)
+                </small>
+            </h4>
+        </div>
+    </div>
+
+    <!-- LEGEND -->
+    <div class="calendar-legend mb-3">
+        <div class="d-flex flex-wrap gap-3">
+            <div class="legend-item">
+                <div class="legend-color today"></div>
+                <span>Today</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color has-entry"></div>
+                <span>Has Entries</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color selected"></div>
+                <span>Selected</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- CALENDAR GRID -->
+    <div class="calendar-container">
+        <div class="calendar-grid">
+            <div class="calendar-weekdays">
+                @foreach (var day in dayNames)
+                {
+                    <div class="calendar-weekday">@day</div>
+                }
+            </div>
+
+            <div class="calendar-days">
+                @for (int i = 0; i < StartDay; i++)
+                {
+                    <div class="calendar-day empty"></div>
+                }
+
+                @for (int day = 1; day <= DaysInMonth; day++)
+                {
+                    var date = new DateTime(CurrentDate.Year, CurrentDate.Month, day);
+                    var hasEntry = entries.Any(e => e.EntryDate.Date == date.Date);
+                    var isToday = date.Date == DateTime.Today;
+                    var isSelected = selectedDate?.Date == date.Date;
+                    var entryCount = entries.Count(e => e.EntryDate.Date == date.Date);
+
+                    <div class="calendar-day @(isToday ? "today" : "") @(hasEntry ? "has-entry" : "") @(isSelected ? "selected" : "")"
+                         @onclick="() => SelectDate(date)">
+                        <div class="day-number">@day</div>
+                        @if (hasEntry)
+                        {
+                            <div class="entry-info">
+                                <div class="entry-count">
+                                    <i class="bi bi-journal-text"></i>
+                                    <span>@entryCount</span>
+                                </div>
+                                @if (isToday)
+                                {
+                                    <div class="today-badge">Today</div>
+                                }
+                            </div>
+                        }
+                        else if (isToday)
+                        {
+                            <div class="entry-info">
+                                <div class="today-badge">Today</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- SELECTED DATE ENTRIES -->
+    @if (selectedDate.HasValue)
+    {
+        <div class="selected-date-section mt-4">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-journal-text me-2"></i>
+                            Entries for @selectedDate.Value.ToString("dddd, MMMM d, yyyy")
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary me-2" @onclick="ClearSelection">
+                                <i class="bi bi-x me-1"></i>Clear
+                            </button>
+                            <a href="/create?date=@selectedDate.Value.ToString("yyyy-MM-dd")" class="btn btn-sm btn-primary">
+                                <i class="bi bi-plus me-1"></i>Add Entry
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    @if (selectedEntries.Any())
+                    {
+                        <div class="entries-list">
+                            @foreach (var entry in selectedEntries)
+                            {
+                                <div class="entry-item">
+                                    <div class="entry-header">
+                                        <h6 class="entry-title mb-1">@entry.Title</h6>
+                                        <div class="entry-time">
+                                            <i class="bi bi-clock me-1"></i>
+                                            @entry.EntryDate.ToString("hh:mm tt")
+                                        </div>
+                                    </div>
+
+                                    <p class="entry-preview mb-2">@GetContentPreview(entry.Content)</p>
+
+                                    <div class="entry-footer">
+                                        <div class="entry-meta">
+                                            <span class="badge bg-primary me-2">
+                                                <i class="bi bi-emoji-smile me-1"></i>@entry.PrimaryMood
+                                            </span>
+                                            @if (entry.Tags.Any())
+                                            {
+                                                @foreach (var tag in entry.Tags.Take(2))
+                                                {
+                                                    <span class="badge bg-light text-dark me-1">
+                                                        <i class="bi bi-tag me-1"></i>@tag.TagName
+                                                    </span>
+                                                }
+                                                @if (entry.Tags.Count > 2)
+                                                {
+                                                    <span class="badge bg-light text-dark">
+                                                        +@(entry.Tags.Count - 2)
+                                                    </span>
+                                                }
+                                            }
+                                        </div>
+
+                                        <div class="entry-actions">
+                                            <a href="/view/@entry.Id" class="btn btn-sm btn-outline-primary me-1">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="/edit/@entry.Id" class="btn btn-sm btn-outline-secondary">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <hr class="my-2" />
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-4">
+                            <i class="bi bi-journal-x display-4 text-muted mb-3"></i>
+                            <h5>No entries for this date</h5>
+                            <p class="text-muted mb-4">Start writing your thoughts for this day</p>
+                            <a href="/create?date=@selectedDate.Value.ToString("yyyy-MM-dd")" class="btn btn-primary">
+                                <i class="bi bi-plus-circle me-2"></i>Create Entry
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    /* Page Layout */
+    .calendar-page {
+        padding: 1rem;
+        background-color: #f8f9fa;
+        min-height: 100vh;
+    }
+
+    .calendar-header {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .month-navigation {
+        padding-top: 1rem;
+        border-top: 1px solid #dee2e6;
+    }
+
+    .current-month {
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    .month-year {
+        font-size: 1.5rem;
+    }
+
+    /* Legend */
+    .calendar-legend {
+        background: white;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+    }
+
+        .legend-color.today {
+            background: #0d6efd;
+        }
+
+        .legend-color.has-entry {
+            background: #28a745;
+        }
+
+        .legend-color.selected {
+            background: #ffc107;
+        }
+
+    /* Calendar Grid */
+    .calendar-container {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 1px;
+        background-color: #dee2e6;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .calendar-weekdays, .calendar-days {
+        display: contents;
+    }
+
+    .calendar-weekday {
+        background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
+        color: white;
+        padding: 1rem;
+        text-align: center;
+        font-weight: 600;
+        font-size: 0.9rem;
+        border-right: 1px solid rgba(255,255,255,0.1);
+    }
+
+        .calendar-weekday:last-child {
+            border-right: none;
+        }
+
+    .calendar-day {
+        background-color: white;
+        padding: 0.75rem;
+        min-height: 100px;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.2s ease;
+        border: 2px solid transparent;
+    }
+
+        .calendar-day:hover {
+            background-color: #f8f9fa;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            z-index: 1;
+        }
+
+        .calendar-day.today {
+            background-color: #e7f3ff;
+        }
+
+        .calendar-day.has-entry {
+            background: linear-gradient(135deg, #f8fff8 0%, #e8f5e8 100%);
+        }
+
+        .calendar-day.selected {
+            background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+            border-color: #ffc107;
+            z-index: 2;
+        }
+
+        .calendar-day.empty {
+            background-color: #f8f9fa;
+            cursor: default;
+        }
+
+            .calendar-day.empty:hover {
+                transform: none;
+                box-shadow: none;
+            }
+
+    .day-number {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+
+    .entry-info {
+        position: absolute;
+        bottom: 0.5rem;
+        left: 0.5rem;
+        right: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .entry-count {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.85rem;
+        color: #28a745;
+        font-weight: 500;
+    }
+
+    .today-badge {
+        background: #0d6efd;
+        color: white;
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+
+    /* Selected Date Section */
+    .selected-date-section {
+        animation: slideIn 0.3s ease-out;
+    }
+
+    .entries-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .entry-item {
+        padding: 0.5rem 0;
+    }
+
+    .entry-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 0.5rem;
+    }
+
+    .entry-title {
+        font-weight: 600;
+        color: #2c3e50;
+        margin: 0;
+    }
+
+    .entry-time {
+        font-size: 0.85rem;
+        color: #6c757d;
+        white-space: nowrap;
+    }
+
+    .entry-preview {
+        color: #495057;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        margin: 0;
+    }
+
+    .entry-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 0.5rem;
+    }
+
+    .entry-meta {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+
+    .entry-actions {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    /* Animations */
+    @@keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .calendar-day {
+            min-height: 80px;
+            padding: 0.5rem;
+        }
+
+        .day-number {
+            font-size: 1rem;
+        }
+
+        .entry-count {
+            font-size: 0.75rem;
+        }
+
+        .calendar-weekday {
+            padding: 0.75rem 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .entry-footer {
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: stretch;
+        }
+
+        .entry-actions {
+            justify-content: flex-end;
+        }
+    }
+
+    @@media (max-width: 576px) {
+        .calendar-grid {
+            grid-template-columns: repeat(1, 1fr);
+        }
+
+        .calendar-weekdays {
+            display: none;
+        }
+
+        .calendar-day {
+            min-height: auto;
+            padding: 1rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+            .calendar-day:last-child {
+                border-bottom: none;
+            }
+
+        .calendar-container {
+            padding: 0;
+        }
+    }
+</style>
+
+@code {
+    private DateTime CurrentDate = DateTime.Today;
+    private List<JournalEntry> entries = new();
+    private DateTime? selectedDate = null;
+    private List<JournalEntry> selectedEntries = new();
+    private int entriesThisMonth = 0;
+    private int uniqueEntryDays = 0;
+
+    private string[] dayNames = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+
+    private int DaysInMonth => DateTime.DaysInMonth(CurrentDate.Year, CurrentDate.Month);
+    private int StartDay => (int)new DateTime(CurrentDate.Year, CurrentDate.Month, 1).DayOfWeek;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEntries();
+        CalculateStats();
+    }
+
+    private async Task LoadEntries()
+    {
+        entries = await JournalService.GetAllEntriesWithDetailsAsync();
+        CalculateStats();
+    }
+
+    private void CalculateStats()
+    {
+        var startOfMonth = new DateTime(CurrentDate.Year, CurrentDate.Month, 1);
+        var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
+
+        entriesThisMonth = entries.Count(e =>
+            e.EntryDate >= startOfMonth && e.EntryDate <= endOfMonth);
+
+        uniqueEntryDays = entries
+            .Where(e => e.EntryDate >= startOfMonth && e.EntryDate <= endOfMonth)
+            .Select(e => e.EntryDate.Date)
+            .Distinct()
+            .Count();
+    }
+
+    private void ChangeMonth(int months)
+    {
+        CurrentDate = CurrentDate.AddMonths(months);
+        CalculateStats();
+        selectedDate = null;
+        StateHasChanged();
+    }
+
+    private void GoToToday()
+    {
+        CurrentDate = DateTime.Today;
+        CalculateStats();
+        selectedDate = DateTime.Today;
+        SelectDate(DateTime.Today);
+    }
+
+    private void SelectDate(DateTime date)
+    {
+        selectedDate = date;
+        selectedEntries = entries
+            .Where(e => e.EntryDate.Date == date.Date)
+            .OrderByDescending(e => e.EntryDate)
+            .ToList();
+        StateHasChanged();
+    }
+
+    private void ClearSelection()
+    {
+        selectedDate = null;
+        selectedEntries.Clear();
+        StateHasChanged();
+    }
+
+    private string GetContentPreview(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return "No content";
+
+        var plainText = System.Text.RegularExpressions.Regex.Replace(content, "<.*?>", string.Empty);
+
+        if (plainText.Length > 100)
+        {
+            return plainText.Substring(0, 100) + "...";
+        }
+
         return plainText;
     }
 }
