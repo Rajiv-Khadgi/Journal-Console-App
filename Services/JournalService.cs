@@ -11,33 +11,37 @@ namespace JournalApps.Services
     {
         private readonly AppDatabase _db;
         private readonly DailyLimitService _limit;
+        private readonly UserService _userService;
 
-        public JournalService(AppDatabase db, DailyLimitService limit)
+        public JournalService(AppDatabase db, DailyLimitService limit, UserService userService)
         {
             _db = db;
             _limit = limit;
+            _userService = userService;
         }
 
-        
+        private int CurrentUserId => _userService.CurrentUser?.Id ?? 0;
+
         // Fetch all entries
-        
         public async Task<List<JournalEntry>> GetAllEntriesAsync()
         {
+            if (!_userService.IsAuthenticated) return new List<JournalEntry>();
+
             return await _db.Connection.Table<JournalEntry>()
-                .Where(j => !j.IsDeleted)
+                .Where(j => j.UserId == CurrentUserId && !j.IsDeleted)
                 .OrderByDescending(j => j.EntryDate)
                 .ToListAsync();
         }
 
-
         // Fetch single entry
         public async Task<JournalEntry?> GetEntryByIdAsync(int id)
         {
+            if (!_userService.IsAuthenticated) return null;
+
             return await _db.Connection.Table<JournalEntry>()
-                .Where(j => j.Id == id && !j.IsDeleted)
+                .Where(j => j.Id == id && j.UserId == CurrentUserId && !j.IsDeleted)
                 .FirstOrDefaultAsync();
         }
-
 
         // Fetch tags for an entry
         public async Task<List<Tag>> GetTagsByEntryIdAsync(int entryId)
@@ -55,9 +59,7 @@ namespace JournalApps.Services
                 .ToListAsync();
         }
 
-        
         // Fetch entries with related data
-        
         public async Task<List<JournalEntry>> GetAllEntriesWithDetailsAsync()
         {
             var entries = await GetAllEntriesAsync();
@@ -82,14 +84,15 @@ namespace JournalApps.Services
             return entry;
         }
 
-       
         // Create entry
-        
-        public async Task<bool> CreateEntryAsync(JournalEntry entry, List<Tag> tags, List<SecondaryMood> moods)
+        public async Task<bool> CreateEntryAsync(JournalEntry entry, List<Tag> tags, List<SecondaryMood> moods, bool bypassLimits = false)
         {
-            if (!await _limit.CanCreateAsync())
+            if (!_userService.IsAuthenticated) return false;
+
+            if (!bypassLimits && !await _limit.CanCreateAsync())
                 return false;
 
+            entry.UserId = CurrentUserId;
             entry.CreatedAt = DateTime.Now;
             entry.UpdatedAt = DateTime.Now;
 
@@ -100,6 +103,7 @@ namespace JournalApps.Services
             foreach (var tag in tags)
             {
                 tag.JournalEntryId = entry.Id;
+                tag.UserId = CurrentUserId;
                 await _db.Connection.InsertAsync(tag);
             }
 
@@ -107,20 +111,29 @@ namespace JournalApps.Services
             foreach (var mood in moods)
             {
                 mood.JournalEntryId = entry.Id;
+                mood.UserId = CurrentUserId;
                 await _db.Connection.InsertAsync(mood);
             }
 
-            // Record the creation in history
-            await _limit.MarkCreatedAsync(entry.Id); // CHANGED: Now passing entryId
+            // Record the creation in history ONLY if not bypassing limits (assuming real user action)
+            // OR we can decide to always log it. 
+            // If we bypass limits for seeding, we usually don't want to block the user from creating a real entry today.
+            if (!bypassLimits)
+            {
+                await _limit.MarkCreatedAsync(entry.Id);
+            }
+            
             return true;
         }
 
-       
         // Update entry
-        
-        public async Task<bool> UpdateEntryAsync(JournalEntry entry, List<Tag> tags, List<SecondaryMood> moods)
+        public async Task<bool> UpdateEntryAsync(JournalEntry entry, List<Tag> tags, List<SecondaryMood> moods, bool bypassLimits = false)
         {
-            if (!await _limit.CanUpdateAsync())
+            if (!_userService.IsAuthenticated) return false;
+            // Verify ownership
+            if (entry.UserId != CurrentUserId) return false;
+
+            if (!bypassLimits && !await _limit.CanUpdateAsync())
                 return false;
 
             entry.UpdatedAt = DateTime.Now;
@@ -134,25 +147,31 @@ namespace JournalApps.Services
             foreach (var tag in tags)
             {
                 tag.JournalEntryId = entry.Id;
+                tag.UserId = CurrentUserId;
                 await _db.Connection.InsertAsync(tag);
             }
 
             foreach (var mood in moods)
             {
                 mood.JournalEntryId = entry.Id;
+                mood.UserId = CurrentUserId;
                 await _db.Connection.InsertAsync(mood);
             }
 
-            await _limit.MarkUpdatedAsync(entry.Id);
+            if (!bypassLimits)
+            {
+                await _limit.MarkUpdatedAsync(entry.Id);
+            }
             return true;
         }
 
-       
         // Delete entry
-        
-        public async Task<bool> DeleteEntryAsync(JournalEntry entry)
+        public async Task<bool> DeleteEntryAsync(JournalEntry entry, bool bypassLimits = false)
         {
-            if (!await _limit.CanDeleteAsync())
+            if (!_userService.IsAuthenticated) return false;
+            if (entry.UserId != CurrentUserId) return false;
+
+            if (!bypassLimits && !await _limit.CanDeleteAsync())
                 return false;
 
             entry.IsDeleted = true;
@@ -160,9 +179,11 @@ namespace JournalApps.Services
 
             await _db.Connection.UpdateAsync(entry);
 
-            await _limit.MarkDeletedAsync(entry.Id);
+            if (!bypassLimits)
+            {
+                await _limit.MarkDeletedAsync(entry.Id);
+            }
             return true;
         }
-
     }
 }

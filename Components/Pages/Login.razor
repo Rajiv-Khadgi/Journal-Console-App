@@ -1,0 +1,65 @@
+@page "/login"
+@layout JournalApps.Components.Layout.AuthLayout
+@inject UserService UserService
+@inject NavigationManager Navigation
+
+<div class="auth-container">
+    <div class="auth-card">
+        <h3 class="text-center mb-4">Welcome Back</h3>
+        
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <div class="mb-3">
+            <label>Username</label>
+            <input type="text" class="form-control" @bind="username" />
+        </div>
+        <div class="mb-3">
+            <label>Password</label>
+            <input type="password" class="form-control" @bind="password" />
+        </div>
+
+        <button class="btn btn-primary w-100 mb-3" @onclick="HandleLogin">Login</button>
+        
+        <div class="text-center">
+            <a href="/register">Create an account</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .auth-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 80vh;
+    }
+    .auth-card {
+        width: 100%;
+        max-width: 400px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        background: white;
+    }
+</style>
+
+@code {
+    private string username = "";
+    private string password = "";
+    private string errorMessage = "";
+
+    private async Task HandleLogin()
+    {
+        if (await UserService.LoginUserAsync(username, password))
+        {
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            errorMessage = "Invalid username or password";
+        }
+    }
+}

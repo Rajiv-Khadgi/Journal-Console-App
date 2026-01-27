@@ -32,6 +32,9 @@ namespace JournalApps.Data
             await Connection.CreateTableAsync<UpdateHistory>();
             await Connection.CreateTableAsync<DeleteHistory>();
             await Connection.CreateTableAsync<CreateHistory>();
+            
+            // User table for authentication
+            await Connection.CreateTableAsync<User>();
         }
     }
 }

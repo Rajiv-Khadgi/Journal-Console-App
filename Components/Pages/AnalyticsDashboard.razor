@@ -4,6 +4,38 @@
 
 <h3>Journal Analytics Dashboard</h3>
 
+<!-- DATE RANGE FILTER -->
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Date Range Filter</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label class="form-label">From Date</label>
+                            <input type="date" class="form-control"
+                                   @bind="filterStartDate"
+                                   @bind:format="yyyy-MM-dd" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">To Date</label>
+                            <input type="date" class="form-control"
+                                   @bind="filterEndDate"
+                                   @bind:format="yyyy-MM-dd" />
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button class="btn btn-primary w-100" @onclick="LoadAnalytics">
+                                Update Analytics
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 @if (isLoading)
 {
     <div class="text-center py-5">
@@ -16,36 +48,56 @@
 else
 {
     <!-- QUICK STATS ROW -->
-    <div class="row mb-4">
+    <div class="row g-4 mb-4">
         <div class="col-md-3">
-            <div class="card text-white bg-primary">
-                <div class="card-body">
-                    <h5 class="card-title">Total Entries</h5>
-                    <h2 class="card-text">@totalEntries</h2>
+            <div class="card border-0 shadow-sm h-100 stat-card">
+                <div class="card-body d-flex align-items-center">
+                    <div class="icon-shape bg-primary text-white rounded-3 me-3 p-3">
+                        <i class="bi bi-journal-text fs-3"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted mb-0">Total Entries</h6>
+                        <h2 class="mb-0 fw-bold">@totalEntries</h2>
+                    </div>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card text-white bg-success">
-                <div class="card-body">
-                    <h5 class="card-title">Current Streak</h5>
-                    <h2 class="card-text">@currentStreak days</h2>
+            <div class="card border-0 shadow-sm h-100 stat-card">
+                <div class="card-body d-flex align-items-center">
+                    <div class="icon-shape bg-success text-white rounded-3 me-3 p-3">
+                        <i class="bi bi-fire fs-3"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted mb-0">Current Streak</h6>
+                        <h2 class="mb-0 fw-bold">@currentStreak days</h2>
+                    </div>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card text-white bg-info">
-                <div class="card-body">
-                    <h5 class="card-title">Longest Streak</h5>
-                    <h2 class="card-text">@longestStreak days</h2>
+            <div class="card border-0 shadow-sm h-100 stat-card">
+                <div class="card-body d-flex align-items-center">
+                    <div class="icon-shape bg-info text-white rounded-3 me-3 p-3">
+                        <i class="bi bi-trophy fs-3"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted mb-0">Longest Streak</h6>
+                        <h2 class="mb-0 fw-bold">@longestStreak days</h2>
+                    </div>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card text-white bg-warning">
-                <div class="card-body">
-                    <h5 class="card-title">Missed Days</h5>
-                    <h2 class="card-text">@missedDays</h2>
+            <div class="card border-0 shadow-sm h-100 stat-card">
+                <div class="card-body d-flex align-items-center">
+                    <div class="icon-shape bg-warning text-white rounded-3 me-3 p-3">
+                        <i class="bi bi-calendar-x fs-3"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted mb-0">Missed Days</h6>
+                        <h2 class="mb-0 fw-bold">@missedDays</h2>
+                    </div>
                 </div>
             </div>
         </div>
@@ -206,37 +258,7 @@ else
         </div>
     </div>
 
-    <!-- DATE RANGE FILTER -->
-    <div class="row mt-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5>Date Range Filter</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <label class="form-label">From Date</label>
-                            <input type="date" class="form-control"
-                                   @bind="filterStartDate"
-                                   @bind:format="yyyy-MM-dd" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">To Date</label>
-                            <input type="date" class="form-control"
-                                   @bind="filterEndDate"
-                                   @bind:format="yyyy-MM-dd" />
-                        </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                            <button class="btn btn-primary w-100" @onclick="LoadAnalytics">
-                                Update Analytics
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+
 }
 
 <style>
@@ -398,7 +420,7 @@ else
             CalculateTagStatistics();
             CalculateQuickStats();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Silent error
         }

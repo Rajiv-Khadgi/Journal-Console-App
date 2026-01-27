@@ -1,0 +1,77 @@
+@page "/register"
+@layout JournalApps.Components.Layout.AuthLayout
+@inject UserService UserService
+@inject NavigationManager Navigation
+
+<div class="auth-container">
+    <div class="auth-card">
+        <h3 class="text-center mb-4">Create Account</h3>
+        
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+
+        <div class="mb-3">
+            <label>Username</label>
+            <input type="text" class="form-control" @bind="username" />
+        </div>
+        <div class="mb-3">
+            <label>Password</label>
+            <input type="password" class="form-control" @bind="password" />
+        </div>
+        <div class="mb-3">
+            <label>Confirm Password</label>
+            <input type="password" class="form-control" @bind="confirmPassword" />
+        </div>
+
+        <button class="btn btn-primary w-100 mb-3" @onclick="HandleRegister">Register</button>
+        
+        <div class="text-center">
+            <a href="/login">Already have an account? Login</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .auth-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 80vh;
+    }
+    .auth-card {
+        width: 100%;
+        max-width: 400px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        background: white;
+    }
+</style>
+
+@code {
+    private string username = "";
+    private string password = "";
+    private string confirmPassword = "";
+    private string errorMessage = "";
+
+    private async Task HandleRegister()
+    {
+        if (password != confirmPassword)
+        {
+            errorMessage = "Passwords do not match";
+            return;
+        }
+
+        if (await UserService.RegisterUserAsync(username, password))
+        {
+            // Redirect to login page for explicit login
+            Navigation.NavigateTo("/login");
+        }
+        else
+        {
+            errorMessage = "Username already exists or invalid input";
+        }
+    }
+}

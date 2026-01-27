@@ -1,33 +1,97 @@
 ﻿@inherits LayoutComponentBase
-@inject SecurityService SecurityService
+@inject UserService UserService
+@inject ThemeService ThemeService
+@inject NavigationManager Navigation
+@implements IDisposable
 
-<SecurityWrapper>
-    <div class="page">
-        <div class="sidebar">
-            <NavMenu />
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            @if (UserService.IsAuthenticated)
+            {
+                <span class="me-3">Welcome, <strong>@UserService.CurrentUser?.Username</strong></span>
+                <button class="btn btn-sm btn-outline-danger" @onclick="Logout">
+                    <i class="oi oi-account-logout"></i> Logout
+                </button>
+            }
+            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank" class="ms-3">About</a>
         </div>
 
-        <main>
-            <div class="top-row px-4">
-                @if (!SecurityService.IsLocked && SecurityService.IsPinSet())
-                {
-                    <button class="btn btn-sm btn-outline-secondary" @onclick="LockApp" title="Lock App">
-                        <i class="oi oi-lock-locked"></i> Lock
-                    </button>
-                }
-                <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-            </div>
-
-            <article class="content px-4">
-                @Body
-            </article>
-        </main>
-    </div>
-</SecurityWrapper>
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
 
 @code {
-    private void LockApp()
+    protected override void OnInitialized()
     {
-        SecurityService.Lock();
+        UserService.OnAuthStateChanged += StateHasChanged;
+        ThemeService.OnThemeChanged += StateHasChanged;
+        Navigation.LocationChanged += OnLocationChanged;
+        
+        CheckAuth();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try 
+            {
+                await ThemeService.InitializeAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Theme initialization error: {ex.Message}");
+            }
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        CheckAuth();
+        StateHasChanged();
+    }
+
+    private void CheckAuth()
+    {
+        try 
+        {
+            var path = Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath;
+            
+            // Allow public pages
+            if (path == "/" || path.Equals("/login", StringComparison.OrdinalIgnoreCase) || 
+                path.Equals("/register", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (!UserService.IsAuthenticated)
+            {
+                Navigation.NavigateTo("/login");
+            }
+        }
+        catch (Exception ex)
+        {
+             Console.WriteLine($"Auth check error: {ex.Message}");
+        }
+    }
+
+    private void Logout()
+    {
+        UserService.Logout();
+        Navigation.NavigateTo("/login");
+    }
+
+    public void Dispose()
+    {
+        UserService.OnAuthStateChanged -= StateHasChanged;
+        ThemeService.OnThemeChanged -= StateHasChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
     }
 }

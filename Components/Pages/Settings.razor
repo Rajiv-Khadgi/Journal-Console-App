@@ -1,222 +1,277 @@
 ﻿@page "/settings"
-@inject SecurityService SecurityService
-@inject NavigationManager Navigation
+@inject ThemeService ThemeService
+@inject SeedDataService SeedDataService
+@inject IJSRuntime JSRuntime
+@implements IDisposable
 
-<h3>Security Settings</h3>
-
-<div class="card">
-    <div class="card-header">
-        <h5>PIN Protection</h5>
+<div class="settings-container">
+    <div class="settings-header">
+        <h1 class="page-title">Settings</h1>
     </div>
-    <div class="card-body">
-        @if (SecurityService.IsPinSet())
-        {
-            <!-- Change PIN -->
-            <div class="mb-3">
-                <h6>Change PIN</h6>
-                <div class="row">
-                    <div class="col-md-4">
-                        <input type="password" class="form-control" 
-                               placeholder="Current PIN" maxlength="4"
-                               @bind="currentPin" />
+
+    <div class="form-section mb-4">
+        <div class="section-header">
+            <h3><i class="bi bi-palette me-2"></i>Appearance</h3>
+        </div>
+        <div class="section-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-1">Theme</h5>
+                    <p class="text-muted mb-0">Customize the look and feel of your journal</p>
+                </div>
+                <div class="btn-group">
+                    <button class="btn @(!isDarkMode ? "btn-primary" : "btn-outline-primary")" 
+                            @onclick="() => SetTheme(false)">Light</button>
+                    <button class="btn @(isDarkMode ? "btn-primary" : "btn-outline-primary")" 
+                            @onclick="() => SetTheme(true)">Dark</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="form-section">
+        <div class="section-header">
+            <h3><i class="bi bi-person-badge me-2"></i>Account Management</h3>
+        </div>
+        <div class="section-body">
+             <div class="mb-4">
+                 <h5 class="mb-3">Change Password</h5>
+                 <div class="row g-3">
+                     <div class="col-md-4">
+                         <input type="password" class="form-control" placeholder="Current Password" @bind="currentPassword" />
+                     </div>
+                     <div class="col-md-4">
+                         <input type="password" class="form-control" placeholder="New Password" @bind="newPassword" />
+                     </div>
+                     <div class="col-md-4">
+                         <button class="btn btn-outline-primary w-100" @onclick="ChangePassword">Update Password</button>
+                     </div>
+                 </div>
+                 @if (!string.IsNullOrEmpty(passwordMessage))
+                 {
+                     <div class="mt-2 text-@passwordMessageType small">@passwordMessage</div>
+                 }
+             </div>
+             
+             <hr />
+             
+             <div class="mt-4">
+                 <h5 class="text-danger mb-2">Danger Zone</h5>
+                 <p class="text-muted small mb-3">Once you delete your account, there is no going back. Please be certain.</p>
+                 <button class="btn btn-outline-danger" @onclick="ShowDeleteConfirm">
+                     <i class="bi bi-trash me-1"></i>Delete Account
+                 </button>
+             </div>
+        </div>
+    </div>
+    
+    <!-- Delete Account Modal -->
+    @if (showDeleteConfirm)
+    {
+        <div class="modal-backdrop fade show"></div>
+        <div class="modal fade show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title text-danger">Delete Account?</h5>
+                        <button type="button" class="btn-close" @onclick="CancelDelete"></button>
                     </div>
-                    <div class="col-md-4">
-                        <input type="password" class="form-control" 
-                               placeholder="New PIN" maxlength="4"
-                               @bind="newPin" />
+                    <div class="modal-body">
+                        <p>This will permanently delete your account and all <strong>@entryCount</strong> journal entries.</p>
+                        <div class="mb-3">
+                            <label class="form-label">Enter your password to confirm:</label>
+                            <input type="password" class="form-control" @bind="deletePassword" />
+                        </div>
+                        @if (!string.IsNullOrEmpty(deleteMessage))
+                        {
+                            <div class="text-danger small">@deleteMessage</div>
+                        }
                     </div>
-                    <div class="col-md-4">
-                        <input type="password" class="form-control" 
-                               placeholder="Confirm New PIN" maxlength="4"
-                               @bind="confirmPin" />
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                        <button type="button" class="btn btn-danger" @onclick="DeleteAccount">Delete My Account</button>
                     </div>
                 </div>
-                <button class="btn btn-primary mt-2" @onclick="ChangePin" :disabled="isProcessing">
-                    @if (isProcessing)
+            </div>
+        </div>
+    }
+
+    <div class="form-section">
+        <div class="section-header">
+            <h3><i class="bi bi-database me-2"></i>Data Management</h3>
+        </div>
+        <div class="section-body">
+             <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-1">Generate Seed Data</h5>
+                    <p class="text-muted mb-0">Add ~20 sample entries with diverse moods and tags.</p>
+                </div>
+                <button class="btn btn-warning" @onclick="GenerateData" disabled="@isGenerating">
+                    @if (isGenerating)
                     {
                         <span class="spinner-border spinner-border-sm me-2"></span>
                     }
-                    Change PIN
-                </button>
-            </div>
-            
-            <!-- Remove PIN -->
-            <div class="mb-3">
-                <h6>Remove PIN Protection</h6>
-                <p class="text-muted">Your journal will no longer be protected with a PIN.</p>
-                <button class="btn btn-outline-danger" @onclick="RemovePin">
-                    Remove PIN
-                </button>
-            </div>
-            
-            <!-- Lock Now -->
-            <div>
-                <h6>Lock App</h6>
-                <p class="text-muted">Immediately lock the app.</p>
-                <button class="btn btn-outline-secondary" @onclick="LockNow">
-                    <i class="oi oi-lock-locked"></i> Lock Now
-                </button>
-            </div>
-        }
-        else
-        {
-            <!-- Setup PIN -->
-            <div>
-                <h6>Setup PIN Protection</h6>
-                <p class="text-muted">Protect your journal with a 4-digit PIN.</p>
-                <div class="row">
-                    <div class="col-md-6">
-                        <input type="password" class="form-control" 
-                               placeholder="Enter 4-digit PIN" maxlength="4"
-                               @bind="newPin" />
-                    </div>
-                    <div class="col-md-6">
-                        <input type="password" class="form-control" 
-                               placeholder="Confirm PIN" maxlength="4"
-                               @bind="confirmPin" />
-                    </div>
-                </div>
-                <button class="btn btn-primary mt-2" @onclick="SetPin" :disabled="isProcessing">
-                    @if (isProcessing)
+                    else 
                     {
-                        <span class="spinner-border spinner-border-sm me-2"></span>
+                         <i class="bi bi-lightning-charge me-1"></i>
                     }
-                    Setup PIN
+                    Generate Data
                 </button>
             </div>
-        }
-        
-        <!-- Status Messages -->
-        @if (!string.IsNullOrEmpty(message))
-        {
-            <div class="alert @(isError ? "alert-danger" : "alert-success") mt-3">
-                @message
-            </div>
-        }
+             @if (!string.IsNullOrEmpty(statusMessage))
+            {
+                <div class="alert alert-success mt-3">@statusMessage</div>
+            }
+        </div>
     </div>
 </div>
 
 <style>
-    input[type="password"] {
-        letter-spacing: 3px;
-        font-size: 1.2rem;
-        text-align: center;
-    }
+    .settings-container { padding: 2rem; background-color: var(--bg-color, #f8f9fa); min-height: 100vh; }
+    .page-title { font-weight: 700; color: var(--text-color, #2c3e50); margin-bottom: 2rem; }
+    .form-section { background: var(--card-bg, white); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 2rem; }
+    .section-header { padding: 1.25rem 1.5rem; background: var(--header-bg, linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)); border-bottom: 1px solid var(--border-color, #dee2e6); }
+    .section-header h3 { font-size: 1.1rem; font-weight: 600; color: var(--text-color, #2c3e50); margin: 0; display: flex; align-items: center; }
+    .section-body { padding: 1.5rem; color: var(--text-color, #212529); }
+    
+    .btn-group .btn { border-radius: 0; }
+    .btn-group .btn:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+    .btn-group .btn:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+    
+    .text-muted { color: var(--text-muted, #6c757d) !important; }
 </style>
 
 @code {
-    private string currentPin = "";
-    private string newPin = "";
-    private string confirmPin = "";
-    private string message = "";
-    private bool isError = false;
-    private bool isProcessing = false;
+    private bool isGenerating = false;
+    private string statusMessage = "";
+    private bool isDarkMode;
     
-    private async Task SetPin()
+    // Account Management
+    private string currentPassword = "";
+    private string newPassword = "";
+    private string passwordMessage = "";
+    private string passwordMessageType = "success";
+    
+    private bool showDeleteConfirm = false;
+    private string deletePassword = "";
+    private string deleteMessage = "";
+    private int entryCount = 0;
+
+    @inject UserService UserService
+    @inject NavigationManager Navigation
+    @inject JournalService JournalService
+
+    protected override void OnInitialized()
     {
-        if (string.IsNullOrWhiteSpace(newPin) || newPin.Length != 4)
+        ThemeService.OnThemeChanged += HandleThemeChange;
+        
+        isDarkMode = ThemeService.IsDarkMode;
+    }
+
+    private void HandleThemeChange()
+    {
+        isDarkMode = ThemeService.IsDarkMode;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SetTheme(bool dark)
+    {
+        try 
         {
-            ShowMessage("Please enter a 4-digit PIN", true);
+            if (isDarkMode == dark) return;
+            await ThemeService.SetThemeAsync(dark);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Theme Error: {ex.Message}");
+        }
+    }
+    
+    private async Task ChangePassword()
+    {
+        passwordMessage = "";
+        
+        if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+        {
+            passwordMessage = "Please enter both current and new passwords.";
+            passwordMessageType = "danger";
             return;
         }
         
-        if (newPin != confirmPin)
-        {
-            ShowMessage("PINs do not match", true);
-            return;
-        }
-        
-        isProcessing = true;
-        StateHasChanged();
-        
-        var success = await SecurityService.SetPinAsync(newPin);
+        var success = await UserService.ChangePasswordAsync(currentPassword, newPassword);
         
         if (success)
         {
-            ShowMessage("PIN setup successfully!", false);
-            ClearFields();
+            passwordMessage = "Password updated successfully!";
+            passwordMessageType = "success";
+            currentPassword = "";
+            newPassword = "";
         }
         else
         {
-            ShowMessage("Failed to setup PIN", true);
+            passwordMessage = "Incorrect current password.";
+            passwordMessageType = "danger";
         }
-        
-        isProcessing = false;
-        StateHasChanged();
     }
     
-    private async Task ChangePin()
+    private async Task ShowDeleteConfirm()
     {
-        if (string.IsNullOrWhiteSpace(currentPin) || currentPin.Length != 4)
+        var entries = await JournalService.GetAllEntriesAsync();
+        entryCount = entries.Count;
+        showDeleteConfirm = true;
+        deleteMessage = "";
+        deletePassword = "";
+    }
+    
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+    }
+    
+    private async Task DeleteAccount()
+    {
+        if (string.IsNullOrWhiteSpace(deletePassword))
         {
-            ShowMessage("Please enter current PIN", true);
+            deleteMessage = "Please enter your password to confirm.";
             return;
         }
         
-        if (string.IsNullOrWhiteSpace(newPin) || newPin.Length != 4)
-        {
-            ShowMessage("Please enter a 4-digit new PIN", true);
-            return;
-        }
-        
-        if (newPin != confirmPin)
-        {
-            ShowMessage("New PINs do not match", true);
-            return;
-        }
-        
-        isProcessing = true;
-        StateHasChanged();
-        
-        var success = await SecurityService.ChangePinAsync(currentPin, newPin);
+        var success = await UserService.DeleteAccountAsync(deletePassword);
         
         if (success)
         {
-            ShowMessage("PIN changed successfully!", false);
-            ClearFields();
+            Navigation.NavigateTo("/login");
         }
         else
         {
-            ShowMessage("Failed to change PIN. Current PIN may be incorrect.", true);
+            deleteMessage = "Incorrect password.";
         }
-        
-        isProcessing = false;
-        StateHasChanged();
     }
-    
-    private void RemovePin()
+
+    private async Task GenerateData()
     {
-        SecurityService.RemovePin();
-        ShowMessage("PIN protection removed", false);
-    }
-    
-    private void LockNow()
-    {
-        SecurityService.Lock();
-        Navigation.NavigateTo("/", forceLoad: true);
-    }
-    
-    private void ShowMessage(string msg, bool error)
-    {
-        message = msg;
-        isError = error;
-        StateHasChanged();
-        
-        // Clear message after 3 seconds
-        Task.Delay(3000).ContinueWith(_ => 
+        isGenerating = true;
+        statusMessage = "Generating seed data...";
+        await InvokeAsync(StateHasChanged);
+
+        try 
         {
-            InvokeAsync(() =>
-            {
-                message = "";
-                StateHasChanged();
-            });
-        });
+            await SeedDataService.GenerateSeedDataAsync();
+            statusMessage = "Sample data generated successfully!";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error: {ex.Message}";
+        }
+        finally 
+        {
+            isGenerating = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
-    
-    private void ClearFields()
+
+    public void Dispose()
     {
-        currentPin = "";
-        newPin = "";
-        confirmPin = "";
+        ThemeService.OnThemeChanged -= HandleThemeChange;
     }
 }
