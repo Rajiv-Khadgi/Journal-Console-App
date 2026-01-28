@@ -1,52 +1,119 @@
 ﻿@inject NavigationManager Navigation
+@inject UserService UserService
 
-<div class="top-row ps-3 navbar navbar-dark bg-primary">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="/"> JournalApp</a>
+<div class="sidebar @(isCollapsed ? "collapsed" : "expanded")">
+    <!-- Top Brand Row -->
+    <div class="sidebar-header">
+        <div class="brand-section">
+            @if (!isCollapsed)
+            {
+                <span class="navbar-brand">JournalApp</span>
+            }
+            <button class="toggle-btn" @onclick="ToggleSidebar" title="@(isCollapsed ? "Expand" : "Collapse")">
+                <span class="oi @(isCollapsed ? "oi-chevron-right" : "oi-chevron-left")"></span>
+            </button>
+        </div>
     </div>
-</div>
 
-<div>
-    <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="oi oi-home" aria-hidden="true"></span> Home
+    <!-- Navigation Items -->
+    <nav class="sidebar-nav">
+        <div class="nav-item">
+            <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+                <span class="oi oi-home"></span>
+                @if (!isCollapsed)
+                {
+                    <span class="nav-text">Home</span>
+                }
             </NavLink>
         </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="dashboard">
-                <span class="oi oi-dashboard" aria-hidden="true"></span> Dashboard
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
+
+
+
+        <div class="nav-item">
             <NavLink class="nav-link" href="create">
-                <span class="oi oi-plus" aria-hidden="true"></span> New Entry
+                <span class="oi oi-plus"></span>
+                @if (!isCollapsed)
+                {
+                    <span class="nav-text">New Entry</span>
+                }
             </NavLink>
         </div>
-        <div class="nav-item px-3">
+
+        <div class="nav-item">
             <NavLink class="nav-link" href="calendar">
-                <span class="oi oi-calendar" aria-hidden="true"></span> Calendar
+                <span class="oi oi-calendar"></span>
+                @if (!isCollapsed)
+                {
+                    <span class="nav-text">Calendar</span>
+                }
             </NavLink>
         </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="search">
-                <span class="oi oi-magnifying-glass" aria-hidden="true"></span> Search
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
+
+
+
+        <div class="nav-item">
             <NavLink class="nav-link" href="analytics">
-                <span class="oi oi-graph" aria-hidden="true"></span> Analytics
+                <span class="oi oi-graph"></span>
+                @if (!isCollapsed)
+                {
+                    <span class="nav-text">Analytics</span>
+                }
             </NavLink>
         </div>
-        <div class="nav-item px-3">
+
+        <div class="nav-item">
             <NavLink class="nav-link" href="export">
-                <span class="oi oi-cloud-download" aria-hidden="true"></span> Export
+                <span class="oi oi-cloud-download"></span>
+                @if (!isCollapsed)
+                {
+                    <span class="nav-text">Export</span>
+                }
             </NavLink>
         </div>
-        <div class="nav-item px-3">
+
+        <div class="nav-item">
             <NavLink class="nav-link" href="settings">
-                <span class="oi oi-cog" aria-hidden="true"></span> Settings
+                <span class="oi oi-cog"></span>
+                @if (!isCollapsed)
+                {
+                    <span class="nav-text">Settings</span>
+                }
             </NavLink>
+        </div>
+
+        <div class="nav-item">
+            <NavLink class="nav-link" href="dashboard">
+                <span class="oi oi-list"></span>
+                @if (!isCollapsed)
+                {
+                    <span class="nav-text">Jornal List</span>
+                }
+            </NavLink>
+        </div>
+
+        <div class="nav-item mt-auto">
+            <div class="nav-link" @onclick="Logout" style="cursor: pointer;">
+                <span class="oi oi-account-logout"></span>
+                @if (!isCollapsed)
+                {
+                    <span class="nav-text">Logout</span>
+                }
+            </div>
         </div>
     </nav>
 </div>
+
+@code {
+    private bool isCollapsed = false;
+
+    private void ToggleSidebar()
+    {
+        isCollapsed = !isCollapsed;
+    }
+
+    private void Logout()
+    {
+        UserService.Logout();
+        Navigation.NavigateTo("/login");
+    }
+}

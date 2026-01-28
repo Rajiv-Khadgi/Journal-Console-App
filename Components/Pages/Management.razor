@@ -1,0 +1,906 @@
+﻿@page "/dashboard"
+@inject JournalService JournalService
+@inject DailyLimitService LimitService
+@inject NavigationManager Navigation
+
+<div class="dashboard-container">
+    @if (!string.IsNullOrEmpty(limitErrorMessage))
+    {
+        <div class="alert alert-warning alert-dismissible fade show mb-4 shadow-sm" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            @limitErrorMessage
+            <button type="button" class="btn-close" @onclick='() => limitErrorMessage = ""' aria-label="Close"></button>
+        </div>
+    }
+
+    <!-- HEADER SECTION -->
+    <div class="dashboard-header mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h3 class="dashboard-title mb-1">
+                    <i class="bi bi-journal-text me-2"></i>Journal Dashboard
+                </h3>
+                <p class="text-muted mb-0">Manage and explore your journal entries</p>
+            </div>
+            <div>
+                <a href="/create" class="btn btn-primary">
+                    <i class="bi bi-plus-circle me-2"></i>New Entry
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEARCH FILTERS SECTION -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white border-0 py-3">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-search me-2"></i>Search & Filters
+                @if (hasActiveFilters)
+                {
+                    <span class="badge bg-primary ms-2">Active</span>
+                }
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <!-- SEARCH TERM -->
+                <div class="col-md-4 col-lg-3">
+                    <label class="form-label fw-medium">Search Text</label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" class="form-control"
+                               placeholder="Search entries..."
+                               @bind="searchTerm"
+                               @bind:event="oninput" />
+                    </div>
+                </div>
+
+                <!-- DATE RANGE -->
+                <div class="col-md-8 col-lg-5">
+                    <label class="form-label fw-medium">Date Range</label>
+                    <div class="row g-2">
+                        <div class="col">
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-calendar"></i>
+                                </span>
+                                <input type="date" class="form-control"
+                                       @bind="startDate"
+                                       @bind:format="yyyy-MM-dd" />
+                            </div>
+                            <small class="form-text text-muted">From</small>
+                        </div>
+                        <div class="col">
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-calendar"></i>
+                                </span>
+                                <input type="date" class="form-control"
+                                       @bind="endDate"
+                                       @bind:format="yyyy-MM-dd" />
+                            </div>
+                            <small class="form-text text-muted">To</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PRIMARY MOOD FILTER -->
+                <div class="col-md-6 col-lg-2">
+                    <label class="form-label fw-medium">Mood</label>
+                    <select class="form-select" @bind="selectedPrimaryMood">
+                        <option value="">All Moods</option>
+                        @foreach (var mood in allPrimaryMoods)
+                        {
+                            <option value="@mood">@mood</option>
+                        }
+                    </select>
+                </div>
+
+                <!-- TAGS FILTER -->
+                <div class="col-md-6 col-lg-2">
+                    <label class="form-label fw-medium">Tags</label>
+                    <select class="form-select" @bind="selectedTag">
+                        <option value="">All Tags</option>
+                        @foreach (var tag in allTags)
+                        {
+                            <option value="@tag">@tag</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <!-- ACTION BUTTONS -->
+            <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                <div>
+                    @if (hasActiveFilters)
+                    {
+                        <span class="text-muted">
+                            <i class="bi bi-funnel me-1"></i>
+                            Filters applied
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="text-muted">
+                            <i class="bi bi-info-circle me-1"></i>
+                            No active filters
+                        </span>
+                    }
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-secondary" @onclick="ClearFilters">
+                        <i class="bi bi-x-circle me-1"></i>Clear
+                    </button>
+                    <button class="btn btn-primary" @onclick="ApplyFilters">
+                        <i class="bi bi-filter me-1"></i>Apply Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ENTRIES TABLE SECTION -->
+    @if (entries == null)
+    {
+        <div class="text-center py-5">
+            <div class="loading-spinner">
+                <i class="bi bi-journal-text"></i>
+            </div>
+            <h5 class="mt-4">Loading your journal entries...</h5>
+            <p class="text-muted">Please wait while we fetch your memories</p>
+        </div>
+    }
+    else if (!filteredEntries.Any())
+    {
+        <div class="empty-state text-center py-5">
+            <div class="empty-state-icon mb-4">
+                <i class="bi bi-journal-x"></i>
+            </div>
+            <h4>No Entries Found</h4>
+            <p class="text-muted mb-4">
+                @if (hasActiveFilters)
+                {
+                    <span>No entries match your search criteria.</span>
+                }
+                else
+                {
+                    <span>You haven't created any journal entries yet.</span>
+                }
+            </p>
+            <div class="d-flex justify-content-center gap-3">
+                @if (hasActiveFilters)
+                {
+                    <button class="btn btn-outline-primary" @onclick="ClearFilters">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Clear Filters
+                    </button>
+                }
+                <a href="/create" class="btn btn-primary">
+                    <i class="bi bi-plus-circle me-1"></i>Create New Entry
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- ENTRIES TABLE -->
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-0 py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-list-ul me-2"></i>Entries
+                        <span class="badge bg-light text-dark ms-2">@filteredEntries.Count</span>
+                    </h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="text-muted small">Items per page:</span>
+                        <select class="form-select form-select-sm w-auto" @bind="itemsPerPage" @bind:after="ApplyFilters">
+                            <option value="5">5</option>
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>
+                                <button class="btn btn-sm btn-link p-0 text-decoration-none">
+                                    Title <i class="bi bi-arrow-down-up ms-1"></i>
+                                </button>
+                            </th>
+                            <th>
+                                <button class="btn btn-sm btn-link p-0 text-decoration-none">
+                                    Date <i class="bi bi-arrow-down-up ms-1"></i>
+                                </button>
+                            </th>
+                            <th>Mood</th>
+                            <th>Tags</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in pagedEntries)
+                        {
+                            <tr class="entry-row" @onclick="() => ViewEntry(entry.Id)">
+                                <td class="fw-semibold">
+                                    <div class="d-flex align-items-center">
+                                        <div class="entry-icon me-2">
+                                            <i class="bi bi-journal-text"></i>
+                                        </div>
+                                        <div>
+                                            <div class="entry-title">@entry.Title</div>
+                                            <small class="text-muted entry-preview">
+                                                @GetContentPreview(entry.Content)
+                                            </small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="entry-date">
+                                        @entry.EntryDate.ToString("MMM dd, yyyy")
+                                    </div>
+                                    <small class="text-muted">
+                                        @entry.EntryDate.ToString("hh:mm tt")
+                                    </small>
+                                </td>
+                                <td>
+                                    <div class="mood-display">
+                                        <span class="mood-badge" style="background-color: @GetMoodColor(entry.PrimaryMood);">
+                                            <i class="bi bi-emoji-smile me-1"></i>@entry.PrimaryMood
+                                        </span>
+                                        @if (entry.SecondaryMoods.Any())
+                                        {
+                                            <small class="text-muted ms-2">
+                                                +@entry.SecondaryMoods.Count more
+                                            </small>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="tags-container">
+                                        @foreach (var tag in entry.Tags.Take(2))
+                                        {
+                                            <span class="tag-badge">
+                                                <i class="bi bi-tag me-1"></i>@tag.TagName
+                                            </span>
+                                        }
+                                        @if (entry.Tags.Count > 2)
+                                        {
+                                            <span class="tag-more">
+                                                +@(entry.Tags.Count - 2)
+                                            </span>
+                                        }
+                                    </div>
+                                </td>
+                                <td @onclick:stopPropagation>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <button class="btn btn-outline-primary" @onclick="() => ViewEntry(entry.Id)" title="View">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                        <button class="btn btn-outline-secondary" @onclick="() => EditEntry(entry.Id)" title="Edit">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn @(canDeleteToday ? "btn-outline-danger" : "btn-outline-secondary opacity-50")" 
+                                                @onclick="() => ShowDeleteConfirm(entry.Id)" 
+                                                title="@(canDeleteToday ? "Delete" : "Daily delete limit reached")">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- PAGINATION & FOOTER -->
+            <div class="card-footer bg-white border-0 py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="text-muted">
+                        Showing <strong>@((currentPage - 1) * itemsPerPage + 1)</strong> to 
+                        <strong>@Math.Min(currentPage * itemsPerPage, filteredEntries.Count)</strong> of 
+                        <strong>@filteredEntries.Count</strong> entries
+                    </div>
+                    
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                                <button class="page-link" @onclick="() => ChangePage(1)" title="First">
+                                    <i class="bi bi-chevron-double-left"></i>
+                                </button>
+                            </li>
+                            <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                                <button class="page-link" @onclick="() => ChangePage(currentPage - 1)" title="Previous">
+                                    <i class="bi bi-chevron-left"></i>
+                                </button>
+                            </li>
+                            
+                            @for (int i = Math.Max(1, currentPage - 2); i <= Math.Min(totalPages, currentPage + 2); i++)
+                            {
+                                <li class="page-item @(currentPage == i ? "active" : "")">
+                                    <button class="page-link" @onclick="() => ChangePage(i)">
+                                        @i
+                                    </button>
+                                </li>
+                            }
+                            
+                            <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
+                                <button class="page-link" @onclick="() => ChangePage(currentPage + 1)" title="Next">
+                                    <i class="bi bi-chevron-right"></i>
+                                </button>
+                            </li>
+                            <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
+                                <button class="page-link" @onclick="() => ChangePage(totalPages)" title="Last">
+                                    <i class="bi bi-chevron-double-right"></i>
+                                </button>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    }
+    <!-- Delete Confirmation Modal -->
+    @if (entryToDelete != null)
+    {
+        <div class="modal-backdrop fade show" style="opacity: 0.5;"></div>
+        <div class="modal fade show d-block" tabindex="-1" style="z-index: 1050;">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header border-0 pb-0">
+                        <h5 class="modal-title fw-bold">
+                            <i class="bi bi-trash text-danger me-2"></i>
+                            Delete Entry
+                        </h5>
+                        <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                    </div>
+                    <div class="modal-body py-4">
+                        <p class="mb-3">Are you sure you want to delete this entry?</p>
+
+                        <div class="alert alert-light border">
+                            <div class="d-flex align-items-start">
+                                <i class="bi bi-journal-text text-primary fs-5 me-3"></i>
+                                <div>
+                                    <h6 class="mb-1">@entryToDelete.Title</h6>
+                                    <small class="text-muted d-block mb-2">
+                                        <i class="bi bi-calendar me-1"></i>
+                                        @entryToDelete.EntryDate.ToString("MMM dd, yyyy")
+                                    </small>
+                                    <p class="text-truncate mb-0">
+                                        @GetContentPreview(entryToDelete.Content)
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Note:</strong> You can only delete <strong>one</strong> entry per day.
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CancelDelete">
+                            Cancel
+                        </button>
+                        <button type="button" class="btn btn-danger" @onclick="ConfirmDelete">
+                            <i class="bi bi-trash me-1"></i>
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    /* Dashboard Container */
+    .dashboard-container {
+        padding: 1.5rem;
+        background-color: #f8f9fa;
+        min-height: 100vh;
+    }
+
+    .dashboard-header {
+        padding: 1.5rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .dashboard-title {
+        font-weight: 700;
+        color: #2c3e50;
+    }
+
+    /* Stats Cards */
+    .stat-card {
+        border-radius: 12px;
+        padding: 1.5rem;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.15);
+        }
+
+    .stat-icon {
+        font-size: 2.5rem;
+        opacity: 0.9;
+        margin-right: 1rem;
+    }
+
+    .stat-number {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin: 0;
+        line-height: 1.2;
+    }
+
+    .stat-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        margin: 0;
+    }
+
+    /* Loading Spinner */
+    .loading-spinner {
+        font-size: 3rem;
+        color: #0d6efd;
+        animation: pulse 2s infinite;
+    }
+
+    @@keyframes pulse {
+        0% { opacity: 0.6; transform: scale(0.95); }
+        50% { opacity: 1; transform: scale(1.05); }
+        100% { opacity: 0.6; transform: scale(0.95); }
+    }
+
+    /* Empty State */
+    .empty-state {
+        background: white;
+        border-radius: 12px;
+        padding: 4rem 2rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .empty-state-icon {
+        font-size: 4rem;
+        color: #6c757d;
+        opacity: 0.5;
+    }
+
+    /* Table Styles */
+    .entry-row {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-left: 3px solid transparent;
+    }
+
+        .entry-row:hover {
+            background-color: #f8f9fa;
+            border-left-color: #0d6efd;
+            transform: translateX(2px);
+        }
+
+    .entry-icon {
+        width: 36px;
+        height: 36px;
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #0d6efd;
+    }
+
+    .entry-title {
+        font-weight: 600;
+        color: #2c3e50;
+        line-height: 1.3;
+    }
+
+    .entry-preview {
+        display: block;
+        max-width: 300px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.85rem;
+    }
+
+    .entry-date {
+        font-weight: 500;
+        color: #495057;
+    }
+
+    /* Mood Badge */
+    .mood-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* Tag Badge */
+    .tag-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.2rem 0.6rem;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        color: #495057;
+        margin-right: 0.3rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .tag-more {
+        display: inline-block;
+        padding: 0.2rem 0.6rem;
+        background: #e9ecef;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .tags-container {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    /* Button Group */
+    .btn-group .btn {
+        border-radius: 6px !important;
+        padding: 0.25rem 0.5rem;
+        margin: 0 1px;
+    }
+
+    /* Pagination */
+    .page-item.active .page-link {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+        font-weight: 500;
+    }
+
+    /* Card Styling */
+    .card {
+        border-radius: 12px;
+        border: 1px solid #e9ecef;
+        overflow: hidden;
+    }
+
+    .card-header {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    }
+
+    /* Input Group */
+    .input-group-text {
+        background-color: #f8f9fa;
+        border-color: #dee2e6;
+    }
+
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        transition: all 0.2s ease;
+    }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+        }
+
+    /* Badges */
+    .badge {
+        font-weight: 500;
+        padding: 0.35em 0.65em;
+        border-radius: 6px;
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .dashboard-container {
+            padding: 1rem;
+        }
+        
+        .stat-card {
+            margin-bottom: 1rem;
+        }
+        
+        .btn-group .btn {
+            padding: 0.2rem 0.4rem;
+            font-size: 0.9rem;
+        }
+        
+        .entry-preview {
+            max-width: 150px;
+        }
+    }
+
+    /* Add these styles to your existing CSS */
+
+    /* Action buttons styling */
+    .btn-action {
+        padding: 0.25rem 0.5rem;
+        transition: all 0.2s ease;
+    }
+
+        .btn-action:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+    /* Modal styling */
+    .modal-content {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    }
+
+    .modal-header {
+        padding: 1.25rem 1.5rem 0;
+    }
+
+    .modal-body {
+        padding: 1.5rem 1.5rem 0.5rem;
+    }
+
+    .modal-footer {
+        padding: 1rem 1.5rem 1.5rem;
+    }
+</style>
+
+@code {
+    private List<JournalEntry>? entries;
+    private List<JournalEntry> filteredEntries = new();
+    private List<JournalEntry> pagedEntries = new();
+    private int totalEntries = 0;
+    private bool hasActiveFilters = false;
+    private JournalEntry? entryToDelete = null;
+    private bool canDeleteToday = true;
+    private string limitErrorMessage = "";
+
+    // Pagination
+    private int currentPage = 1;
+    private int itemsPerPage = 10;
+    private int totalPages = 1;
+    private string sortBy = "date_desc";
+
+    // Search filters
+    private string searchTerm = "";
+    private DateTime? startDate;
+    private DateTime? endDate;
+    private string selectedPrimaryMood = "";
+    private string selectedTag = "";
+
+    // Available filters
+    private List<string> allPrimaryMoods = new()
+    {
+        "Happy", "Sad", "Angry", "Relaxed", "Anxious"
+    };
+
+    private List<string> allTags = new()
+    {
+        "Work", "Health", "Study", "Travel", "Family",
+        "Friends", "Exercise", "Reading", "Music", "Nature"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEntriesAsync();
+        canDeleteToday = await LimitService.CanDeleteAsync();
+        
+        // Set default date range (last 30 days)
+        endDate = DateTime.Today;
+        startDate = DateTime.Today.AddDays(-30);
+    }
+
+    private async Task LoadEntriesAsync()
+    {
+        entries = await JournalService.GetAllEntriesWithDetailsAsync();
+        totalEntries = entries.Count;
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        if (entries == null) return;
+
+        var query = entries.AsEnumerable();
+
+        // Apply text search
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var term = searchTerm.ToLower();
+            query = query.Where(e =>
+                e.Title.ToLower().Contains(term) ||
+                e.Content.ToLower().Contains(term));
+        }
+
+        // Apply date range filter
+        if (startDate.HasValue)
+        {
+            query = query.Where(e => e.EntryDate >= startDate.Value);
+        }
+        if (endDate.HasValue)
+        {
+            query = query.Where(e => e.EntryDate <= endDate.Value);
+        }
+
+        // Apply primary mood filter
+        if (!string.IsNullOrEmpty(selectedPrimaryMood))
+        {
+            query = query.Where(e => e.PrimaryMood == selectedPrimaryMood);
+        }
+
+        // Apply tag filter
+        if (!string.IsNullOrEmpty(selectedTag))
+        {
+            query = query.Where(e =>
+                e.Tags.Any(t => t.TagName == selectedTag));
+        }
+
+        // Apply sorting
+        query = sortBy switch
+        {
+            "title_asc" => query.OrderBy(e => e.Title),
+            "title_desc" => query.OrderByDescending(e => e.Title),
+            "date_asc" => query.OrderBy(e => e.EntryDate),
+            _ => query.OrderByDescending(e => e.EntryDate) // default date_desc
+        };
+
+        filteredEntries = query.ToList();
+        
+        // Check if filters are active
+        hasActiveFilters = !string.IsNullOrWhiteSpace(searchTerm) || 
+                          !string.IsNullOrEmpty(selectedPrimaryMood) || 
+                          !string.IsNullOrEmpty(selectedTag) || 
+                          startDate.HasValue || 
+                          endDate.HasValue;
+
+        // Calculate pagination
+        totalPages = (int)Math.Ceiling((double)filteredEntries.Count / itemsPerPage);
+        if (currentPage > totalPages && totalPages > 0)
+            currentPage = Math.Max(1, totalPages);
+
+        // Get current page items
+        pagedEntries = filteredEntries
+            .Skip((currentPage - 1) * itemsPerPage)
+            .Take(itemsPerPage)
+            .ToList();
+        
+        StateHasChanged();
+    }
+
+    private void ClearFilters()
+    {
+        searchTerm = "";
+        startDate = DateTime.Today.AddDays(-30);
+        endDate = DateTime.Today;
+        selectedPrimaryMood = "";
+        selectedTag = "";
+        currentPage = 1;
+        sortBy = "date_desc";
+        ApplyFilters();
+    }
+
+    private void ChangePage(int page)
+    {
+        if (page < 1 || page > totalPages) return;
+
+        currentPage = page;
+        ApplyFilters();
+    }
+
+    private void ToggleSort(string column)
+    {
+        sortBy = column switch
+        {
+            "title" => sortBy == "title_asc" ? "title_desc" : "title_asc",
+            "date" => sortBy == "date_asc" ? "date_desc" : "date_asc",
+            _ => "date_desc"
+        };
+        ApplyFilters();
+    }
+
+    private void ViewEntry(int id)
+    {
+        Navigation.NavigateTo($"/view/{id}");
+    }
+
+    private void EditEntry(int id)
+    {
+        Navigation.NavigateTo($"/edit/{id}");
+    }
+
+ 
+
+
+    private async Task ShowDeleteConfirm(int id)
+    {
+        // Check limit first
+        canDeleteToday = await LimitService.CanDeleteAsync();
+        if (!canDeleteToday)
+        {
+            limitErrorMessage = "You have already deleted an entry today. You can only delete one entry per day.";
+            StateHasChanged();
+            return;
+        }
+
+        var entry = await JournalService.GetEntryByIdAsync(id);
+        if (entry != null)
+        {
+            entryToDelete = entry; // Show the modal
+            StateHasChanged();
+        }
+    }
+
+    private void CancelDelete()
+    {
+        entryToDelete = null;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (entryToDelete != null)
+        {
+            // Actually delete the entry
+            await JournalService.DeleteEntryAsync(entryToDelete);
+
+            // Refresh the list
+            await LoadEntriesAsync();
+
+            // Close the modal
+            entryToDelete = null;
+            canDeleteToday = await LimitService.CanDeleteAsync();
+            StateHasChanged();
+        }
+    }
+
+
+
+    private string GetMoodColor(string mood)
+    {
+        return mood.ToLower() switch
+        {
+            "happy" => "#28a745",
+            "sad" => "#6f42c1",
+            "angry" => "#dc3545",
+            "relaxed" => "#17a2b8",
+            "anxious" => "#fd7e14",
+            _ => "#6c757d"
+        };
+    }
+
+    private string GetContentPreview(string content)
+    {
+        if (string.IsNullOrEmpty(content)) return "No content";
+        
+        var plainText = System.Text.RegularExpressions.Regex.Replace(content, "<.*?>", string.Empty);
+        
+        if (plainText.Length > 60)
+        {
+            return plainText.Substring(0, 60) + "...";
+        }
+        
+        return plainText;
+    }
+}

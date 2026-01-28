@@ -1,0 +1,36 @@
+@inherits LayoutComponentBase
+@inject ThemeService ThemeService
+
+<div class="auth-layout">
+    <main>
+        @Body
+    </main>
+</div>
+
+<style>
+    .auth-layout {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background-color: var(--bg-color); /* Use theme variable */
+        color: var(--text-color);
+    }
+</style>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try 
+            {
+                await ThemeService.InitializeAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Theme initialization error: {ex.Message}");
+            }
+        }
+    }
+}

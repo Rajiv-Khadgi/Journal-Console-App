@@ -1,6 +1,905 @@
-﻿@page "/export"
-<h3>Export</h3>
+﻿@* @page "/export"
+@inject JournalService JournalService
+@inject PdfExportService PdfExportService
+@inject NavigationManager Navigation
+
+<h3>Export Journal Entries</h3>
+
+<div class="card">
+    <div class="card-header">
+        <h5>Export Options</h5>
+    </div>
+    <div class="card-body">
+        <!-- EXPORT TYPE SELECTION -->
+        <!-- EXPORT TYPE SELECTION -->
+        <div class="mb-4">
+            <label class="form-label fw-bold">Export Type</label>
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="radio" name="exportType"
+                       checked="@(exportType == ExportType.DateRange)"
+                       @onchange="@(() => { exportType = ExportType.DateRange; LoadPreview(); })" />
+                <label class="form-check-label">
+                    Date Range
+                </label>
+            </div>
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="radio" name="exportType"
+                       checked="@(exportType == ExportType.AllEntries)"
+                       @onchange="@(() => { exportType = ExportType.AllEntries; LoadPreview(); })" />
+                <label class="form-check-label">
+                    All Entries
+                </label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="exportType"
+                       checked="@(exportType == ExportType.LastMonth)"
+                       @onchange="@(() => { exportType = ExportType.LastMonth; LoadPreview(); })" />
+                <label class="form-check-label">
+                    Last 30 Days
+                </label>
+            </div>
+        </div>
+
+        <!-- DATE RANGE SELECTION (Visible only for DateRange type) -->
+        @if (exportType == ExportType.DateRange)
+        {
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" 
+                           @bind="startDate" @bind:format="yyyy-MM-dd" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" 
+                           @bind="endDate" @bind:format="yyyy-MM-dd" />
+                </div>
+            </div>
+        }
+
+        <!-- PREVIEW STATS -->
+        @if (!isLoading && entries != null)
+        {
+            <div class="alert alert-info">
+                <h6>Export Preview</h6>
+                <p class="mb-1">Entries to export: <strong>@entries.Count</strong></p>
+                <p class="mb-0">Date range: <strong>@GetExportRangeText()</strong></p>
+            </div>
+        }
+
+        <!-- ACTION BUTTONS -->
+        <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+            <button class="btn btn-primary" @onclick="LoadPreview" 
+                    disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                }
+                Preview Export
+            </button>
+            
+            @if (entries != null && entries.Any())
+            {
+                <button class="btn btn-success" @onclick="ExportToPdf">
+                    <i class="oi oi-cloud-download me-1"></i> Export to PDF
+                </button>
+            }
+        </div>
+
+        <!-- RESULT MESSAGE -->
+        @if (!string.IsNullOrEmpty(exportResult))
+        {
+            <div class="alert @(exportResult.Contains("successfully") ? "alert-success" : "alert-danger") mt-3">
+                @exportResult
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .form-check-input:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+    
+    .btn:disabled {
+        opacity: 0.65;
+    }
+</style>
 
 @code {
+    private List<JournalEntry>? entries;
+    private bool isLoading = false;
+    private string exportResult = "";
+    
+    // Export settings
+    private ExportType exportType = ExportType.DateRange;
+    private DateTime startDate = DateTime.Today.AddMonths(-1);
+    private DateTime endDate = DateTime.Today;
+    
+    private enum ExportType
+    {
+        DateRange,
+        AllEntries,
+        LastMonth
+    }
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPreview();
+    }
+    
+    private async Task LoadPreview()
+    {
+        isLoading = true;
+        exportResult = "";
+        StateHasChanged();
+        
+        try
+        {
+            var allEntries = await JournalService.GetAllEntriesWithDetailsAsync();
+            
+            switch (exportType)
+            {
+                case ExportType.DateRange:
+                    entries = allEntries
+                        .Where(e => e.EntryDate.Date >= startDate.Date && e.EntryDate.Date <= endDate.Date)
+                        .ToList();
+                    break;
+                    
+                case ExportType.AllEntries:
+                    entries = allEntries;
+                    break;
+                    
+                case ExportType.LastMonth:
+                    var lastMonthStart = DateTime.Today.AddDays(-30);
+                    entries = allEntries
+                        .Where(e => e.EntryDate.Date >= lastMonthStart.Date && e.EntryDate.Date <= DateTime.Today)
+                        .ToList();
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            exportResult = $"Error loading entries: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task ExportToPdf()
+    {
+        if (entries == null || !entries.Any())
+            return;
+            
+        isLoading = true;
+        exportResult = "";
+        StateHasChanged();
+        
+        try
+        {
+            string filePath;
+            
+            if (exportType == ExportType.DateRange)
+            {
+                filePath = await PdfExportService.ExportDateRangeToPdf(entries, startDate, endDate);
+            }
+            else
+            {
+                filePath = await PdfExportService.ExportEntriesToPdf(entries, GetExportTitle());
+            }
+            
+            exportResult = $" PDF exported successfully! File saved to: {filePath}";
+            
+            // Optionally: Open the file or show download option
+            // For MAUI, you might want to use Launcher to open the file
+        }
+        catch (Exception ex)
+        {
+            exportResult = $" Export failed: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private string GetExportRangeText()
+    {
+        return exportType switch
+        {
+            ExportType.DateRange => $"{startDate:MMM dd, yyyy} to {endDate:MMM dd, yyyy}",
+            ExportType.AllEntries => "All entries",
+            ExportType.LastMonth => "Last 30 days",
+            _ => "Custom range"
+        };
+    }
+    
+    private string GetExportTitle()
+    {
+        return exportType switch
+        {
+            ExportType.DateRange => $"Journal Entries ({startDate:MMM dd, yyyy} to {endDate:MMM dd, yyyy})",
+            ExportType.AllEntries => "All Journal Entries",
+            ExportType.LastMonth => "Journal Entries - Last 30 Days",
+            _ => "Journal Export"
+        };
+    }
+} *@
 
+
+@page "/export"
+@inject JournalService JournalService
+@inject PdfExportService PdfExportService
+@inject NavigationManager Navigation
+
+<div class="export-container">
+    <!-- Header -->
+    <div class="export-header">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="page-title">
+                    <i class="bi bi-download me-2"></i>Export Journal
+                </h1>
+                <p class="page-subtitle">Export your journal entries as PDF</p>
+            </div>
+            <a href="/management" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Export Card -->
+    <div class="form-section">
+        <div class="section-header">
+            <h3>
+                <i class="bi bi-file-earmark-pdf me-2"></i>
+                Export Settings
+            </h3>
+        </div>
+        <div class="section-body">
+            <!-- Export Type Selection -->
+            <div class="export-type-section mb-4">
+                <h5 class="section-title mb-3">
+                    <i class="bi bi-filter me-2"></i>
+                    Select Export Range
+                </h5>
+                
+                <div class="export-options">
+                    <div class="export-option @(exportType == ExportType.DateRange ? "selected" : "")"
+                         @onclick="() => SelectExportType(ExportType.DateRange)">
+                        <div class="option-icon">
+                            <i class="bi bi-calendar-range"></i>
+                        </div>
+                        <div class="option-content">
+                            <h6>Date Range</h6>
+                            <p class="text-muted small mb-0">Select specific dates</p>
+                        </div>
+                        <div class="option-check">
+                            <i class="bi bi-check-circle-fill"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="export-option @(exportType == ExportType.LastMonth ? "selected" : "")"
+                         @onclick="() => SelectExportType(ExportType.LastMonth)">
+                        <div class="option-icon">
+                            <i class="bi bi-calendar-month"></i>
+                        </div>
+                        <div class="option-content">
+                            <h6>Last 30 Days</h6>
+                            <p class="text-muted small mb-0">Recent entries only</p>
+                        </div>
+                        <div class="option-check">
+                            <i class="bi bi-check-circle-fill"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="export-option @(exportType == ExportType.AllEntries ? "selected" : "")"
+                         @onclick="() => SelectExportType(ExportType.AllEntries)">
+                        <div class="option-icon">
+                            <i class="bi bi-archive"></i>
+                        </div>
+                        <div class="option-content">
+                            <h6>All Entries</h6>
+                            <p class="text-muted small mb-0">Complete journal history</p>
+                        </div>
+                        <div class="option-check">
+                            <i class="bi bi-check-circle-fill"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Date Range Selection -->
+            @if (exportType == ExportType.DateRange)
+            {
+                <div class="date-range-section mb-4">
+                    <h5 class="section-title mb-3">
+                        <i class="bi bi-calendar me-2"></i>
+                        Select Dates
+                    </h5>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">From Date</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-calendar"></i>
+                                </span>
+                                <input type="date" 
+                                       class="form-control" 
+                                       @bind="startDate" 
+                                       @bind:format="yyyy-MM-dd"
+                                        />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">To Date</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-calendar"></i>
+                                </span>
+                                <input type="date" 
+                                       class="form-control" 
+                                       @bind="endDate" 
+                                       @bind:format="yyyy-MM-dd"
+                                        />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Preview Stats -->
+            @if (!isLoading && entries != null)
+            {
+                <div class="preview-section mb-4">
+                    <h5 class="section-title mb-3">
+                        <i class="bi bi-eye me-2"></i>
+                        Export Preview
+                    </h5>
+                    <div class="preview-card">
+                        <div class="preview-stats">
+                            <div class="stat-item">
+                                <div class="stat-icon">
+                                    <i class="bi bi-journal-text"></i>
+                                </div>
+                                <div class="stat-content">
+                                    <div class="stat-value">@entries.Count</div>
+                                    <div class="stat-label">Entries</div>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-icon">
+                                    <i class="bi bi-calendar"></i>
+                                </div>
+                                <div class="stat-content">
+                                    <div class="stat-value">@GetExportRangeText()</div>
+                                    <div class="stat-label">Date Range</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        @if (entries.Any())
+                        {
+                            <div class="preview-list mt-3">
+                                <h6>Sample of entries to export:</h6>
+                                <div class="list-group">
+                                    @foreach (var entry in entries.Take(3))
+                                    {
+                                        <div class="list-group-item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>@entry.Title</strong>
+                                                    <div class="text-muted small">
+                                                        @entry.EntryDate.ToString("MMM dd, yyyy")
+                                                    </div>
+                                                </div>
+                                                <span class="badge bg-light text-dark">
+                                                    @entry.PrimaryMood
+                                                </span>
+                                            </div>
+                                        </div>
+                                    }
+                                    @if (entries.Count > 3)
+                                    {
+                                        <div class="list-group-item text-center text-muted">
+                                            <small>... and @(entries.Count - 3) more entries</small>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-light mt-3">
+                                <i class="bi bi-info-circle me-2"></i>
+                                No entries found for the selected range.
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- Action Buttons -->
+            <div class="action-buttons mt-4">
+                <div class="d-flex gap-3">
+                    <button class="btn btn-primary" 
+                            @onclick="LoadPreview">
+                            Refresh
+                    </button>
+                    
+                    @if (entries != null && entries.Any())
+                    {
+                        <button class="btn btn-success" 
+                                @onclick="ExportToPdf"
+                                disabled="@isLoading">
+                            <i class="bi bi-file-earmark-pdf me-1"></i>Export to PDF
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- Result Message -->
+            @if (!string.IsNullOrEmpty(exportResult))
+            {
+                <div class="result-message mt-4">
+                    <div class="alert @(exportResult.Contains("successfully") ? "alert-success" : "alert-danger")" role="alert">
+                        <div class="d-flex align-items-center">
+                            <i class="bi @(exportResult.Contains("successfully") ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-2"></i>
+                            <div>@exportResult</div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Page Layout */
+    .export-container {
+        padding: 2rem;
+        background-color: #f8f9fa;
+        min-height: 100vh;
+    }
+
+    .export-header {
+        margin-bottom: 2rem;
+    }
+
+    .page-title {
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+
+    .page-subtitle {
+        color: #6c757d;
+        font-size: 1.1rem;
+    }
+
+    /* Form Sections */
+    .form-section {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        overflow: hidden;
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .section-header {
+        padding: 1.25rem 1.5rem;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-bottom: 1px solid #dee2e6;
+    }
+
+        .section-header h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin: 0;
+            display: flex;
+            align-items: center;
+        }
+
+    .section-body {
+        padding: 1.5rem;
+    }
+
+    .section-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #495057;
+        display: flex;
+        align-items: center;
+    }
+
+    /* Export Options */
+    .export-options {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .export-option {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+    }
+
+        .export-option:hover {
+            border-color: #dee2e6;
+            background-color: #f8f9fa;
+        }
+
+        .export-option.selected {
+            border-color: #4dabf7;
+            background-color: #e7f3ff;
+        }
+
+    .option-icon {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: #495057;
+    }
+
+    .export-option.selected .option-icon {
+        background: linear-gradient(135deg, #4dabf7 0%, #339af0 100%);
+        color: white;
+    }
+
+    .option-content {
+        flex: 1;
+    }
+
+        .option-content h6 {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.25rem;
+        }
+
+    .export-option.selected .option-content h6 {
+        color: #4dabf7;
+    }
+
+    .option-check {
+        color: #4dabf7;
+        font-size: 1.25rem;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    .export-option.selected .option-check {
+        opacity: 1;
+    }
+
+    /* Date Range Inputs */
+    .input-group-text {
+        background-color: #f8f9fa;
+        border-color: #dee2e6;
+    }
+
+    .form-control {
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        transition: all 0.2s ease;
+    }
+
+        .form-control:focus {
+            border-color: #4dabf7;
+            box-shadow: 0 0 0 0.25rem rgba(77, 171, 247, 0.25);
+        }
+
+    /* Preview Section */
+    .preview-card {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 1.5rem;
+        border: 1px solid #dee2e6;
+    }
+
+    .preview-stats {
+        display: flex;
+        gap: 2rem;
+    }
+
+    .stat-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        background: white;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        color: #4dabf7;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #2c3e50;
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+
+    .preview-list .list-group-item {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        transition: all 0.2s ease;
+    }
+
+        .preview-list .list-group-item:hover {
+            background-color: #f8f9fa;
+            transform: translateX(2px);
+        }
+
+    /* Buttons */
+    .btn {
+        border-radius: 8px;
+        padding: 0.5rem 1.25rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #4dabf7 0%, #339af0 100%);
+        border: none;
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #339af0 0%, #228be6 100%);
+            box-shadow: 0 4px 12px rgba(51, 154, 240, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+
+    .btn-success {
+        background: linear-gradient(135deg, #40c057 0%, #2f9e44 100%);
+        border: none;
+    }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #2f9e44 0%, #2b8a3e 100%);
+            box-shadow: 0 4px 12px rgba(47, 158, 68, 0.3);
+        }
+
+    /* Alerts */
+    .alert {
+        border-radius: 8px;
+        border: none;
+        padding: 1rem;
+    }
+
+    .alert-success {
+        background: #d4edda;
+        border-left: 4px solid #28a745;
+    }
+
+    .alert-danger {
+        background: #f8d7da;
+        border-left: 4px solid #dc3545;
+    }
+
+    .alert-light {
+        background: #f8f9fa;
+        border-left: 4px solid #6c757d;
+    }
+
+    /* Badges */
+    .badge {
+        font-weight: 500;
+        padding: 0.35em 0.65em;
+        border-radius: 6px;
+    }
+
+    /* Spinner */
+    .spinner-border {
+        width: 1rem;
+        height: 1rem;
+        border-width: 0.15em;
+    }
+
+    /* Responsive Design */
+    @@media (max-width: 768px) {
+        .export-container {
+            padding: 1rem;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+        }
+
+        .preview-stats {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .action-buttons .d-flex {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .btn {
+            width: 100%;
+        }
+
+        .export-option {
+            padding: 0.75rem;
+        }
+
+        .option-icon {
+            width: 40px;
+            height: 40px;
+            font-size: 1.25rem;
+        }
+    }
+</style>
+
+@code {
+    private List<JournalEntry>? entries;
+    private bool isLoading = false;
+    private string exportResult = "";
+    
+    // Export settings
+    private ExportType exportType = ExportType.DateRange;
+    private DateTime startDate = DateTime.Today.AddMonths(-1);
+    private DateTime endDate = DateTime.Today;
+    
+    private enum ExportType
+    {
+        DateRange,
+        AllEntries,
+        LastMonth
+    }
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPreview();
+    }
+    
+    private async Task SelectExportType(ExportType type)
+    {
+        exportType = type;
+        await LoadPreview();
+    }
+    
+    private async Task LoadPreview()
+    {
+        isLoading = true;
+        exportResult = "";
+        StateHasChanged();
+        
+        try
+        {
+            var allEntries = await JournalService.GetAllEntriesWithDetailsAsync();
+            
+            switch (exportType)
+            {
+                case ExportType.DateRange:
+                    entries = allEntries
+                        .Where(e => e.EntryDate.Date >= startDate.Date && e.EntryDate.Date <= endDate.Date)
+                        .ToList();
+                    break;
+                    
+                case ExportType.AllEntries:
+                    entries = allEntries;
+                    break;
+                    
+                case ExportType.LastMonth:
+                    var lastMonthStart = DateTime.Today.AddDays(-30);
+                    entries = allEntries
+                        .Where(e => e.EntryDate.Date >= lastMonthStart.Date && e.EntryDate.Date <= DateTime.Today)
+                        .ToList();
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            exportResult = $"Error loading entries: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task ExportToPdf()
+    {
+        if (entries == null || !entries.Any())
+            return;
+            
+        isLoading = true;
+        exportResult = "";
+        StateHasChanged();
+        
+        try
+        {
+            string filePath;
+            
+            if (exportType == ExportType.DateRange)
+            {
+                filePath = await PdfExportService.ExportDateRangeToPdf(entries, startDate, endDate);
+            }
+            else
+            {
+                filePath = await PdfExportService.ExportEntriesToPdf(entries, GetExportTitle());
+            }
+            
+            exportResult = $"PDF exported successfully! File saved to: {filePath}";
+        }
+        catch (Exception ex)
+        {
+            exportResult = $"Export failed: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private string GetExportRangeText()
+    {
+        return exportType switch
+        {
+            ExportType.DateRange => $"{startDate:MMM dd, yyyy} to {endDate:MMM dd, yyyy}",
+            ExportType.AllEntries => "All entries",
+            ExportType.LastMonth => "Last 30 days",
+            _ => "Custom range"
+        };
+    }
+    
+    private string GetExportTitle()
+    {
+        return exportType switch
+        {
+            ExportType.DateRange => $"Journal Entries ({startDate:MMM dd, yyyy} to {endDate:MMM dd, yyyy})",
+            ExportType.AllEntries => "All Journal Entries",
+            ExportType.LastMonth => "Journal Entries - Last 30 Days",
+            _ => "Journal Export"
+        };
+    }
 }

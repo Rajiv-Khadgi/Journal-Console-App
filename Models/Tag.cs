@@ -8,6 +8,10 @@ namespace JournalApps.Models
         public int Id { get; set; }
 
         public int JournalEntryId { get; set; } // Foreign key to JournalEntry
+        
+        [Indexed]
+        public int UserId { get; set; }
+        
         public string TagName { get; set; } = string.Empty;
     }
 }

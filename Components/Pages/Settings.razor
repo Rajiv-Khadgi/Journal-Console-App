@@ -1,6 +1,226 @@
 ﻿@page "/settings"
-<h3>Settings</h3>
+@inject ThemeService ThemeService
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+<div class="settings-container">
+    <div class="settings-header">
+        <h1 class="page-title">Settings</h1>
+    </div>
+
+    <div class="form-section mb-4">
+        <div class="section-header">
+            <h3><i class="bi bi-palette me-2"></i>Appearance</h3>
+        </div>
+        <div class="section-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-1">Theme</h5>
+                    <p class="text-muted mb-0">Customize the look and feel of your journal</p>
+                </div>
+                <div class="btn-group">
+                    <button class="btn @(!isDarkMode ? "btn-primary" : "btn-outline-primary")" 
+                            @onclick="() => SetTheme(false)">Light</button>
+                    <button class="btn @(isDarkMode ? "btn-primary" : "btn-outline-primary")" 
+                            @onclick="() => SetTheme(true)">Dark</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="form-section">
+        <div class="section-header">
+            <h3><i class="bi bi-person-badge me-2"></i>Account Management</h3>
+        </div>
+        <div class="section-body">
+             <div class="mb-4">
+                 <h5 class="mb-3">Change Password</h5>
+                 <div class="row g-3">
+                     <div class="col-md-4">
+                         <input type="password" class="form-control" placeholder="Current Password" @bind="currentPassword" />
+                     </div>
+                     <div class="col-md-4">
+                         <input type="password" class="form-control" placeholder="New Password" @bind="newPassword" />
+                     </div>
+                     <div class="col-md-4">
+                         <button class="btn btn-outline-primary w-100" @onclick="ChangePassword">Update Password</button>
+                     </div>
+                 </div>
+                 @if (!string.IsNullOrEmpty(passwordMessage))
+                 {
+                     <div class="mt-2 text-@passwordMessageType small">@passwordMessage</div>
+                 }
+             </div>
+             
+             <hr />
+             
+             <div class="mt-4">
+                 <h5 class="text-danger mb-2">Danger Zone</h5>
+                 <p class="text-muted small mb-3">Once you delete your account, there is no going back. Please be certain.</p>
+                 <button class="btn btn-outline-danger" @onclick="ShowDeleteConfirm">
+                     <i class="bi bi-trash me-1"></i>Delete Account
+                 </button>
+             </div>
+        </div>
+    </div>
+    
+    <!-- Delete Account Modal -->
+    @if (showDeleteConfirm)
+    {
+        <div class="modal-backdrop fade show"></div>
+        <div class="modal fade show d-block" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title text-danger">Delete Account?</h5>
+                        <button type="button" class="btn-close" @onclick="CancelDelete"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>This will permanently delete your account and all <strong>@entryCount</strong> journal entries.</p>
+                        <div class="mb-3">
+                            <label class="form-label">Enter your password to confirm:</label>
+                            <input type="password" class="form-control" @bind="deletePassword" />
+                        </div>
+                        @if (!string.IsNullOrEmpty(deleteMessage))
+                        {
+                            <div class="text-danger small">@deleteMessage</div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CancelDelete">Cancel</button>
+                        <button type="button" class="btn btn-danger" @onclick="DeleteAccount">Delete My Account</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+</div>
+
+<style>
+    .settings-container { padding: 2rem; background-color: var(--bg-color, #f8f9fa); min-height: 100vh; }
+    .page-title { font-weight: 700; color: var(--text-color, #2c3e50); margin-bottom: 2rem; }
+    .form-section { background: var(--card-bg, white); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 2rem; }
+    .section-header { padding: 1.25rem 1.5rem; background: var(--header-bg, linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)); border-bottom: 1px solid var(--border-color, #dee2e6); }
+    .section-header h3 { font-size: 1.1rem; font-weight: 600; color: var(--text-color, #2c3e50); margin: 0; display: flex; align-items: center; }
+    .section-body { padding: 1.5rem; color: var(--text-color, #212529); }
+    
+    .btn-group .btn { border-radius: 0; }
+    .btn-group .btn:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
+    .btn-group .btn:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
+    
+    .text-muted { color: var(--text-muted, #6c757d) !important; }
+</style>
 
 @code {
+    private bool isDarkMode;
+    
+    // Account Management
+    private string currentPassword = "";
+    private string newPassword = "";
+    private string passwordMessage = "";
+    private string passwordMessageType = "success";
+    
+    private bool showDeleteConfirm = false;
+    private string deletePassword = "";
+    private string deleteMessage = "";
+    private int entryCount = 0;
 
+    @inject UserService UserService
+    @inject NavigationManager Navigation
+    @inject JournalService JournalService
+
+    protected override void OnInitialized()
+    {
+        ThemeService.OnThemeChanged += HandleThemeChange;
+        
+        isDarkMode = ThemeService.IsDarkMode;
+    }
+
+    private void HandleThemeChange()
+    {
+        isDarkMode = ThemeService.IsDarkMode;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SetTheme(bool dark)
+    {
+        try 
+        {
+            if (isDarkMode == dark) return;
+            await ThemeService.SetThemeAsync(dark);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Theme Error: {ex.Message}");
+        }
+    }
+    
+    private async Task ChangePassword()
+    {
+        passwordMessage = "";
+        
+        if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+        {
+            passwordMessage = "Please enter both current and new passwords.";
+            passwordMessageType = "danger";
+            return;
+        }
+        
+        var success = await UserService.ChangePasswordAsync(currentPassword, newPassword);
+        
+        if (success)
+        {
+            passwordMessage = "Password updated successfully!";
+            passwordMessageType = "success";
+            currentPassword = "";
+            newPassword = "";
+        }
+        else
+        {
+            passwordMessage = "Incorrect current password.";
+            passwordMessageType = "danger";
+        }
+    }
+    
+    private async Task ShowDeleteConfirm()
+    {
+        var entries = await JournalService.GetAllEntriesAsync();
+        entryCount = entries.Count;
+        showDeleteConfirm = true;
+        deleteMessage = "";
+        deletePassword = "";
+    }
+    
+    private void CancelDelete()
+    {
+        showDeleteConfirm = false;
+    }
+    
+    private async Task DeleteAccount()
+    {
+        if (string.IsNullOrWhiteSpace(deletePassword))
+        {
+            deleteMessage = "Please enter your password to confirm.";
+            return;
+        }
+        
+        var success = await UserService.DeleteAccountAsync(deletePassword);
+        
+        if (success)
+        {
+            Navigation.NavigateTo("/login");
+        }
+        else
+        {
+            deleteMessage = "Incorrect password.";
+        }
+    }
+
+
+
+    public void Dispose()
+    {
+        ThemeService.OnThemeChanged -= HandleThemeChange;
+    }
 }
