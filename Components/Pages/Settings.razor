@@ -2,105 +2,428 @@
 @inject SecurityService SecurityService
 @inject NavigationManager Navigation
 
-<h3>Security Settings</h3>
-
-<div class="card">
-    <div class="card-header">
-        <h5>PIN Protection</h5>
+<div class="settings-container">
+    <!-- Header -->
+    <div class="settings-header">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="page-title">
+                    <i class="bi bi-shield-lock me-2"></i>Security Settings
+                </h1>
+                <p class="page-subtitle">Manage PIN protection for your journal</p>
+            </div>
+            <a href="/management" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
     </div>
-    <div class="card-body">
-        @if (SecurityService.IsPinSet())
-        {
-            <!-- Change PIN -->
-            <div class="mb-3">
-                <h6>Change PIN</h6>
-                <div class="row">
-                    <div class="col-md-4">
-                        <input type="password" class="form-control" 
-                               placeholder="Current PIN" maxlength="4"
-                               @bind="currentPin" />
+
+    <!-- Main Card -->
+    <div class="form-section">
+        <div class="section-header">
+            <h3>
+                <i class="bi bi-pin me-2"></i>
+                PIN Protection
+            </h3>
+        </div>
+        <div class="section-body">
+            @if (SecurityService.IsPinSet())
+            {
+                    <!-- PIN is Set -->
+                    <div class="security-status mb-4">
+                        <div class="status-badge active">
+                            <i class="bi bi-shield-check"></i>
+                            <span>PIN Protection Active</span>
+                        </div>
+                        <p class="text-muted small mt-1">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Your journal is protected with a 4-digit PIN
+                        </p>
                     </div>
-                    <div class="col-md-4">
-                        <input type="password" class="form-control" 
-                               placeholder="New PIN" maxlength="4"
-                               @bind="newPin" />
+
+                    <!-- Change PIN -->
+                    <div class="mb-4">
+                        <h5 class="section-title mb-3">
+                            <i class="bi bi-key me-2"></i>
+                            Change PIN
+                        </h5>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Current PIN</label>
+                                <input type="password"
+                                       class="form-control pin-input"
+                                       placeholder="••••"
+                                       maxlength="4"
+                                       @bind="currentPin" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">New PIN</label>
+                                <input type="password"
+                                       class="form-control pin-input"
+                                       placeholder="••••"
+                                       maxlength="4"
+                                       @bind="newPin" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Confirm New PIN</label>
+                                <input type="password"
+                                       class="form-control pin-input"
+                                       placeholder="••••"
+                                       maxlength="4"
+                                       @bind="confirmPin" />
+                            </div>
+                        </div>
+                        <button class="btn btn-primary mt-3" @onclick="ChangePin">
+                            change pin
+                        </button>
                     </div>
-                    <div class="col-md-4">
-                        <input type="password" class="form-control" 
-                               placeholder="Confirm New PIN" maxlength="4"
-                               @bind="confirmPin" />
+
+                    <!-- Remove PIN -->
+                    <div class="mb-4">
+                        <h5 class="section-title mb-3">
+                            <i class="bi bi-shield-x me-2"></i>
+                            Remove PIN Protection
+                        </h5>
+                        <div class="alert alert-warning">
+                            <div class="d-flex">
+                                <i class="bi bi-exclamation-triangle-fill me-3 mt-1"></i>
+                                <div>
+                                    <h6 class="alert-heading mb-2">Warning</h6>
+                                    <p class="mb-0">Your journal will no longer be protected with a PIN. Anyone with access to your device can read your entries.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-outline-danger" @onclick="RemovePin">
+                            <i class="bi bi-trash me-1"></i>Remove PIN Protection
+                        </button>
                     </div>
-                </div>
-                <button class="btn btn-primary mt-2" @onclick="ChangePin" :disabled="isProcessing">
-                    @if (isProcessing)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2"></span>
-                    }
-                    Change PIN
-                </button>
-            </div>
-            
-            <!-- Remove PIN -->
-            <div class="mb-3">
-                <h6>Remove PIN Protection</h6>
-                <p class="text-muted">Your journal will no longer be protected with a PIN.</p>
-                <button class="btn btn-outline-danger" @onclick="RemovePin">
-                    Remove PIN
-                </button>
-            </div>
-            
-            <!-- Lock Now -->
-            <div>
-                <h6>Lock App</h6>
-                <p class="text-muted">Immediately lock the app.</p>
-                <button class="btn btn-outline-secondary" @onclick="LockNow">
-                    <i class="oi oi-lock-locked"></i> Lock Now
-                </button>
-            </div>
-        }
-        else
-        {
-            <!-- Setup PIN -->
-            <div>
-                <h6>Setup PIN Protection</h6>
-                <p class="text-muted">Protect your journal with a 4-digit PIN.</p>
-                <div class="row">
-                    <div class="col-md-6">
-                        <input type="password" class="form-control" 
-                               placeholder="Enter 4-digit PIN" maxlength="4"
-                               @bind="newPin" />
+
+                    <!-- Lock Now -->
+                    <div>
+                        <h5 class="section-title mb-3">
+                            <i class="bi bi-lock me-2"></i>
+                            Lock App
+                        </h5>
+                        <p class="text-muted mb-3">Immediately lock the app. You'll need to enter your PIN to access it again.</p>
+                        <button class="btn btn-outline-secondary" @onclick="LockNow">
+                            <i class="bi bi-lock-fill me-1"></i>Lock Now
+                        </button>
                     </div>
-                    <div class="col-md-6">
-                        <input type="password" class="form-control" 
-                               placeholder="Confirm PIN" maxlength="4"
-                               @bind="confirmPin" />
+            }
+            else
+            {
+                    <!-- Setup PIN -->
+                    <div class="security-status mb-4">
+                        <div class="status-badge inactive">
+                            <i class="bi bi-shield"></i>
+                            <span>No PIN Protection</span>
+                        </div>
+                        <p class="text-muted small mt-1">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Your journal is currently not protected
+                        </p>
                     </div>
-                </div>
-                <button class="btn btn-primary mt-2" @onclick="SetPin" :disabled="isProcessing">
-                    @if (isProcessing)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2"></span>
-                    }
-                    Setup PIN
-                </button>
-            </div>
-        }
-        
-        <!-- Status Messages -->
-        @if (!string.IsNullOrEmpty(message))
-        {
-            <div class="alert @(isError ? "alert-danger" : "alert-success") mt-3">
-                @message
-            </div>
-        }
+
+                    <div>
+                        <h5 class="section-title mb-3">
+                            <i class="bi bi-shield-plus me-2"></i>
+                            Setup PIN Protection
+                        </h5>
+                        <p class="text-muted mb-3">Protect your journal with a 4-digit PIN. You'll need to enter this PIN every time you access the app.</p>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Enter 4-digit PIN</label>
+                                <input type="password"
+                                       class="form-control pin-input"
+                                       placeholder="••••"
+                                       maxlength="4"
+                                       @bind="newPin" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Confirm PIN</label>
+                                <input type="password"
+                                       class="form-control pin-input"
+                                       placeholder="••••"
+                                       maxlength="4"
+                                       @bind="confirmPin" />
+                            </div>
+                        </div>
+
+                        <div class="alert alert-light mt-3">
+                            <i class="bi bi-lightbulb me-2"></i>
+                            <small>Choose a PIN you'll remember but others won't guess easily. Avoid common combinations like 1234.</small>
+                        </div>
+
+                        <button class="btn btn-primary mt-3" @onclick="SetPin">
+                            setPin
+                        </button>
+                    </div>
+            }
+
+            <!-- Status Messages -->
+            @if (!string.IsNullOrEmpty(message))
+            {
+                    <div class="alert @(isError ? "alert-danger" : "alert-success") mt-4" role="alert">
+                        <div class="d-flex align-items-center">
+                            <i class="bi @(isError ? "bi-exclamation-triangle-fill" : "bi-check-circle-fill") me-2"></i>
+                            <div>@message</div>
+                        </div>
+                    </div>
+            }
+        </div>
     </div>
 </div>
 
 <style>
-    input[type="password"] {
-        letter-spacing: 3px;
-        font-size: 1.2rem;
+    /* Page Layout */
+    .settings-container {
+        padding: 2rem;
+        background-color: #f8f9fa;
+        min-height: 100vh;
+    }
+
+    .settings-header {
+        margin-bottom: 2rem;
+    }
+
+    .page-title {
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 0.5rem;
+    }
+
+    .page-subtitle {
+        color: #6c757d;
+        font-size: 1.1rem;
+    }
+
+    /* Form Sections */
+    .form-section {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        overflow: hidden;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .section-header {
+        padding: 1.25rem 1.5rem;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-bottom: 1px solid #dee2e6;
+    }
+
+        .section-header h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin: 0;
+            display: flex;
+            align-items: center;
+        }
+
+    .section-body {
+        padding: 1.5rem;
+    }
+
+    .section-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #495057;
+        display: flex;
+        align-items: center;
+    }
+
+    /* Security Status */
+    .security-status {
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+        .status-badge.active {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-badge.inactive {
+            background: #f8f9fa;
+            color: #6c757d;
+            border: 1px solid #dee2e6;
+        }
+
+        .status-badge i {
+            font-size: 1rem;
+        }
+
+    /* PIN Input */
+    .pin-input {
+        font-size: 1.5rem;
         text-align: center;
+        letter-spacing: 8px;
+        padding: 0.75rem;
+        font-weight: 600;
+        color: #2c3e50;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        height: 50px;
+    }
+
+        .pin-input:focus {
+            border-color: #4dabf7;
+            box-shadow: 0 0 0 0.25rem rgba(77, 171, 247, 0.25);
+            outline: none;
+        }
+
+        .pin-input::placeholder {
+            letter-spacing: normal;
+            color: #adb5bd;
+            font-weight: 400;
+            font-size: 1rem;
+        }
+
+    /* Form Labels */
+    .form-label {
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    /* Buttons */
+    .btn {
+        border-radius: 8px;
+        padding: 0.5rem 1.25rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #4dabf7 0%, #339af0 100%);
+        border: none;
+    }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #339af0 0%, #228be6 100%);
+            box-shadow: 0 4px 12px rgba(51, 154, 240, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+
+    .btn-outline-danger:hover {
+        box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
+    }
+
+    .btn-outline-secondary:hover {
+        box-shadow: 0 4px 12px rgba(108, 117, 125, 0.2);
+    }
+
+    /* Alerts */
+    .alert {
+        border-radius: 8px;
+        border: none;
+        padding: 1rem;
+    }
+
+    .alert-warning {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+    }
+
+    .alert-light {
+        background: #f8f9fa;
+        border-left: 4px solid #dee2e6;
+    }
+
+    .alert-danger {
+        background: #f8d7da;
+        border-left: 4px solid #dc3545;
+    }
+
+    .alert-success {
+        background: #d4edda;
+        border-left: 4px solid #28a745;
+    }
+
+    /* Spinner */
+    .spinner-border {
+        width: 1rem;
+        height: 1rem;
+        border-width: 0.15em;
+    }
+
+    /* Responsive Design */
+    @@media (max-width: 768px) {
+        .settings-container {
+            padding: 1rem;
+        }
+
+        .page-title {
+            font-size: 1.5rem;
+        }
+
+        .pin-input {
+            font-size: 1.25rem;
+            letter-spacing: 6px;
+            padding: 0.5rem;
+            height: 45px;
+        }
+
+        .section-body {
+            padding: 1rem;
+        }
+
+        .btn {
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+
+        .row.g-3 > [class*="col-"] {
+            margin-bottom: 1rem;
+        }
+    }
+
+    /* Animations */
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .alert {
+        animation: fadeIn 0.3s ease;
     }
 </style>
 
@@ -111,7 +434,7 @@
     private string message = "";
     private bool isError = false;
     private bool isProcessing = false;
-    
+
     private async Task SetPin()
     {
         if (string.IsNullOrWhiteSpace(newPin) || newPin.Length != 4)
@@ -119,18 +442,18 @@
             ShowMessage("Please enter a 4-digit PIN", true);
             return;
         }
-        
+
         if (newPin != confirmPin)
         {
             ShowMessage("PINs do not match", true);
             return;
         }
-        
+
         isProcessing = true;
         StateHasChanged();
-        
+
         var success = await SecurityService.SetPinAsync(newPin);
-        
+
         if (success)
         {
             ShowMessage("PIN setup successfully!", false);
@@ -140,11 +463,11 @@
         {
             ShowMessage("Failed to setup PIN", true);
         }
-        
+
         isProcessing = false;
         StateHasChanged();
     }
-    
+
     private async Task ChangePin()
     {
         if (string.IsNullOrWhiteSpace(currentPin) || currentPin.Length != 4)
@@ -152,24 +475,24 @@
             ShowMessage("Please enter current PIN", true);
             return;
         }
-        
+
         if (string.IsNullOrWhiteSpace(newPin) || newPin.Length != 4)
         {
             ShowMessage("Please enter a 4-digit new PIN", true);
             return;
         }
-        
+
         if (newPin != confirmPin)
         {
             ShowMessage("New PINs do not match", true);
             return;
         }
-        
+
         isProcessing = true;
         StateHasChanged();
-        
+
         var success = await SecurityService.ChangePinAsync(currentPin, newPin);
-        
+
         if (success)
         {
             ShowMessage("PIN changed successfully!", false);
@@ -179,31 +502,31 @@
         {
             ShowMessage("Failed to change PIN. Current PIN may be incorrect.", true);
         }
-        
+
         isProcessing = false;
         StateHasChanged();
     }
-    
+
     private void RemovePin()
     {
         SecurityService.RemovePin();
         ShowMessage("PIN protection removed", false);
     }
-    
+
     private void LockNow()
     {
         SecurityService.Lock();
         Navigation.NavigateTo("/", forceLoad: true);
     }
-    
+
     private void ShowMessage(string msg, bool error)
     {
         message = msg;
         isError = error;
         StateHasChanged();
-        
+
         // Clear message after 3 seconds
-        Task.Delay(3000).ContinueWith(_ => 
+        Task.Delay(3000).ContinueWith(_ =>
         {
             InvokeAsync(() =>
             {
@@ -212,7 +535,7 @@
             });
         });
     }
-    
+
     private void ClearFields()
     {
         currentPin = "";
