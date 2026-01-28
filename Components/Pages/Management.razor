@@ -1,5 +1,4 @@
-﻿@page "/management"
-@page "/dashboard"
+﻿@page "/dashboard"
 @inject JournalService JournalService
 @inject DailyLimitService LimitService
 @inject NavigationManager Navigation
@@ -286,7 +285,9 @@
                                         <button class="btn btn-outline-secondary" @onclick="() => EditEntry(entry.Id)" title="Edit">
                                             <i class="bi bi-pencil"></i>
                                         </button>
-                                        <button class="btn btn-outline-danger" @onclick="() => ShowDeleteConfirm(entry.Id)" title="Delete">
+                                        <button class="btn @(canDeleteToday ? "btn-outline-danger" : "btn-outline-secondary opacity-50")" 
+                                                @onclick="() => ShowDeleteConfirm(entry.Id)" 
+                                                title="@(canDeleteToday ? "Delete" : "Daily delete limit reached")">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </div>

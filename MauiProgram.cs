@@ -33,7 +33,6 @@ namespace JournalApps
             builder.Services.AddSingleton<PdfExportService>();
             builder.Services.AddSingleton<UserService>();
             builder.Services.AddSingleton<ThemeService>();
-            builder.Services.AddSingleton<SeedDataService>();
 
 
             return builder.Build();

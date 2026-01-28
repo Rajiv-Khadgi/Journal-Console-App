@@ -1,6 +1,5 @@
 ﻿@page "/settings"
 @inject ThemeService ThemeService
-@inject SeedDataService SeedDataService
 @inject IJSRuntime JSRuntime
 @implements IDisposable
 
@@ -96,34 +95,6 @@
         </div>
     }
 
-    <div class="form-section">
-        <div class="section-header">
-            <h3><i class="bi bi-database me-2"></i>Data Management</h3>
-        </div>
-        <div class="section-body">
-             <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-1">Generate Seed Data</h5>
-                    <p class="text-muted mb-0">Add ~20 sample entries with diverse moods and tags.</p>
-                </div>
-                <button class="btn btn-warning" @onclick="GenerateData" disabled="@isGenerating">
-                    @if (isGenerating)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2"></span>
-                    }
-                    else 
-                    {
-                         <i class="bi bi-lightning-charge me-1"></i>
-                    }
-                    Generate Data
-                </button>
-            </div>
-             @if (!string.IsNullOrEmpty(statusMessage))
-            {
-                <div class="alert alert-success mt-3">@statusMessage</div>
-            }
-        </div>
-    </div>
 </div>
 
 <style>
@@ -142,8 +113,6 @@
 </style>
 
 @code {
-    private bool isGenerating = false;
-    private string statusMessage = "";
     private bool isDarkMode;
     
     // Account Management
@@ -248,27 +217,7 @@
         }
     }
 
-    private async Task GenerateData()
-    {
-        isGenerating = true;
-        statusMessage = "Generating seed data...";
-        await InvokeAsync(StateHasChanged);
 
-        try 
-        {
-            await SeedDataService.GenerateSeedDataAsync();
-            statusMessage = "Sample data generated successfully!";
-        }
-        catch (Exception ex)
-        {
-            statusMessage = $"Error: {ex.Message}";
-        }
-        finally 
-        {
-            isGenerating = false;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
 
     public void Dispose()
     {
